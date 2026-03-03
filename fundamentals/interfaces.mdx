@@ -1,0 +1,638 @@
+---
+title: 'Interfaces in Go'
+description: 'Master polymorphism, dependency injection, and writing testable code with Go interfaces'
+---
+
+## Overview
+
+Interfaces are Go's most powerful feature. Unlike Java or C#, Go interfaces are satisfied **implicitly**—you never say `implements Notifier`. If a type has the required methods, it automatically satisfies the interface.
+
+<Note>
+  "Accept interfaces, return structs" - This is the golden rule of Go API design.
+</Note>
+
+## What is an Interface?
+
+An interface is a **contract** that defines behavior without specifying implementation.
+
+```go
+type Shape interface {
+    Area() float64
+}
+```
+
+This interface says: "I don't care what you are. I only care that you can calculate your area."
+
+## Implicit Implementation
+
+<Tabs>
+  <Tab title="Go (Implicit)">
+    ```go area/main.go
+    package main
+    
+    import "fmt"
+    
+    type Shape interface {
+        Area() float64
+    }
+    
+    type Square struct {
+        l, b float64
+    }
+    
+    type Circle struct {
+        r float64
+    }
+    
+    func (s Square) Area() float64 {
+        return s.l * s.b
+    }
+    
+    func (c Circle) Area() float64 {
+        return 3.14 * c.r * c.r
+    }
+    
+    func printArea(z Shape) float64 {
+        return z.Area()
+    }
+    
+    func main() {
+        x := Square{10, 20}
+        y := Circle{10}
+        fmt.Println(printArea(x))  // 200
+        fmt.Println(printArea(y))  // 314
+    }
+    ```
+    
+    **Notice:** We never declared that `Square` or `Circle` implement `Shape`. They just do, because they have an `Area()` method.
+  </Tab>
+  
+  <Tab title="Java (Explicit)">
+    ```java
+    // Java requires explicit declaration
+    interface Shape {
+        double area();
+    }
+    
+    class Square implements Shape {  // Must declare
+        public double area() {
+            return l * b;
+        }
+    }
+    ```
+    
+    Go's approach is more flexible—you can make existing types satisfy new interfaces without modifying their code.
+  </Tab>
+</Tabs>
+
+## Basic Polymorphism
+
+Polymorphism means treating different types uniformly based on shared behavior.
+
+```go task3/main.go
+package main
+
+import "fmt"
+
+type Speaker interface {
+	Speak() string
+}
+
+type Human struct {
+	name string
+}
+
+func (h Human) Speak() string {
+	return "Hello, I'm " + h.name
+}
+
+func greet(s Speaker) {
+	fmt.Println(s.Speak())
+}
+
+func main() {
+	h := Human{name: "Alice"}
+	greet(h)  // Human satisfies Speaker
+}
+```
+
+<Steps>
+  <Step title="Define the interface">
+    `Speaker` defines the contract: "You must have a `Speak()` method."
+  </Step>
+  
+  <Step title="Implement the method">
+    `Human` has a `Speak()` method, so it automatically satisfies `Speaker`.
+  </Step>
+  
+  <Step title="Use polymorphically">
+    The `greet()` function works with **any** type that can speak, not just `Human`.
+  </Step>
+</Steps>
+
+## Real-World Example: Logger
+
+Let's see how interfaces enable swapping implementations:
+
+```go logger/main.go
+package main
+
+import "fmt"
+
+type Logger interface {
+	Log(msg string)
+}
+
+type ConsoleLogger struct{}
+
+type FileLogger struct{}
+
+func (c ConsoleLogger) Log(msg string) {
+	fmt.Println("console:", msg)
+}
+
+func (f FileLogger) Log(msg string) {
+	fmt.Println("file:", msg)
+}
+
+func doWork(l Logger) {
+	l.Log("starting work")
+	l.Log("working...")
+	l.Log("done")
+}
+
+func main() {
+	c := ConsoleLogger{}
+	f := FileLogger{}
+
+	doWork(c)  // Logs to console
+	doWork(f)  // Logs to file
+}
+```
+
+**The Power:**
+- `doWork()` has **no idea** what logger it's using
+- We can add `DatabaseLogger` without touching `doWork()`
+- Perfect for testing: create a `MockLogger` that captures messages
+
+<Note>
+  This is the foundation of **Dependency Injection** in Go.
+</Note>
+
+## Dependency Injection
+
+Dependency Injection means passing dependencies as parameters instead of creating them inside functions.
+
+```go task2/main.go
+package main
+
+import "fmt"
+
+type Notifier interface {
+	Notify() string
+}
+
+type Email struct {
+	address string
+}
+
+func (e Email) Notify() string {
+	return "Email sent to " + e.address
+}
+
+// The function says: "I don't know what you are,
+// but I know you can Notify"
+func send(n Notifier) {
+	fmt.Println(n.Notify())
+}
+
+func main() {
+	email := Email{address: "user@example.com"}
+	send(email)
+}
+```
+
+### The 4-Step Blueprint for Clean Architecture
+
+This pattern is the foundation for writing maintainable Go code:
+
+```go task5/main.go
+package main
+
+import "fmt"
+
+/*
+STEP 1: Define the behavior you care about.
+This is the interface.
+*/
+type Notifier interface {
+	Notify() string
+}
+
+/*
+STEP 2: Create a concrete implementation (Email).
+*/
+type Email struct {
+	address string
+}
+
+func (e Email) Notify() string {
+	return "Email sent to " + e.address
+}
+
+/*
+STEP 3: Create another implementation (SMS).
+*/
+type SMS struct {
+	number string
+}
+
+func (s SMS) Notify() string {
+	return "SMS sent to " + s.number
+}
+
+/*
+STEP 4: Business logic that depends on the INTERFACE,
+not on Email or SMS.
+*/
+func sendNotification(n Notifier) {
+	// This function has NO IDEA what concrete type n is.
+	// It only knows one thing: n can Notify().
+	fmt.Println(n.Notify())
+}
+
+func main() {
+	email := Email{address: "user@example.com"}
+	sms := SMS{number: "9999999999"}
+
+	sendNotification(email)
+	sendNotification(sms)
+}
+```
+
+<Steps>
+  <Step title="Step 1: Define Behavior">
+    Create an interface that describes **what** you need, not **how** it's done.
+  </Step>
+  
+  <Step title="Step 2: First Implementation">
+    Build a concrete type that satisfies the interface.
+  </Step>
+  
+  <Step title="Step 3: Second Implementation">
+    Add another type. This proves your abstraction is useful.
+  </Step>
+  
+  <Step title="Step 4: Depend on the Interface">
+    Write business logic that depends on the interface, not concrete types.
+  </Step>
+</Steps>
+
+<Warning>
+  Don't create interfaces before you need them. Wait until you have at least 2 implementations before abstracting.
+</Warning>
+
+## Data Sources: A Practical Pattern
+
+```go task8/main.go
+package main
+
+import "fmt"
+
+type DataSource interface {
+	ReadData() string
+}
+
+type FileSource struct {
+	name string
+}
+
+type NetworkSource struct {
+	url string
+}
+
+func (d FileSource) ReadData() string {
+	return "reading from file: " + d.name
+}
+
+func (n NetworkSource) ReadData() string {
+	return "reading from network: " + n.url
+}
+
+func process(ds DataSource) {
+	fmt.Println(ds.ReadData())
+}
+
+func main() {
+	f := FileSource{name: "config.txt"}
+	n := NetworkSource{url: "https://example.com"}
+
+	process(f)
+	process(n)
+}
+```
+
+**Use Cases:**
+- Configuration: Read from file, environment, or remote service
+- Caching: Try memory cache, then Redis, then database
+- Testing: Use fake data source instead of real API
+
+## Interface Composition
+
+Interfaces can embed other interfaces:
+
+```go
+type Reader interface {
+    Read(p []byte) (n int, err error)
+}
+
+type Writer interface {
+    Write(p []byte) (n int, err error)
+}
+
+type Closer interface {
+    Close() error
+}
+
+// Compose interfaces
+type ReadWriteCloser interface {
+    Reader
+    Writer
+    Closer
+}
+```
+
+<Accordion title="Standard Library Examples">
+  ```go
+  // io.ReadWriter combines Reader and Writer
+  type ReadWriter interface {
+      Reader
+      Writer
+  }
+  
+  // http.ResponseWriter has multiple methods
+  type ResponseWriter interface {
+      Header() Header
+      Write([]byte) (int, error)
+      WriteHeader(statusCode int)
+  }
+  ```
+</Accordion>
+
+## Empty Interface
+
+The empty interface `interface{}` (or `any` in Go 1.18+) can hold any value:
+
+```go
+func Print(v interface{}) {
+    fmt.Println(v)
+}
+
+Print(42)
+Print("hello")
+Print(User{name: "Alice"})
+```
+
+<Warning>
+  Use `any` sparingly. It sacrifices type safety. Prefer specific interfaces when possible.
+</Warning>
+
+## Type Assertions and Type Switches
+
+<Tabs>
+  <Tab title="Type Assertion">
+    Extract the concrete type from an interface:
+    
+    ```go
+    var i interface{} = "hello"
+    
+    // Type assertion
+    s := i.(string)
+    fmt.Println(s)  // "hello"
+    
+    // Safe type assertion
+    s, ok := i.(string)
+    if ok {
+        fmt.Println(s)
+    }
+    
+    // Panics if wrong type
+    n := i.(int)  // ❌ panic: interface conversion
+    ```
+  </Tab>
+  
+  <Tab title="Type Switch">
+    Handle multiple types:
+    
+    ```go
+    func describe(i interface{}) {
+        switch v := i.(type) {
+        case int:
+            fmt.Printf("Integer: %d\n", v)
+        case string:
+            fmt.Printf("String: %s\n", v)
+        case bool:
+            fmt.Printf("Boolean: %v\n", v)
+        default:
+            fmt.Printf("Unknown type: %T\n", v)
+        }
+    }
+    
+    describe(42)      // Integer: 42
+    describe("hello") // String: hello
+    describe(true)    // Boolean: true
+    ```
+  </Tab>
+</Tabs>
+
+## Interface Best Practices
+
+<Steps>
+  <Step title="Keep interfaces small">
+    The best interfaces have 1-3 methods. The smaller, the better.
+    
+    ```go
+    // ✅ Good: Single responsibility
+    type Reader interface {
+        Read(p []byte) (n int, err error)
+    }
+    
+    // ❌ Bad: Too many responsibilities
+    type DataManager interface {
+        Read() []byte
+        Write([]byte)
+        Delete()
+        Validate()
+        Transform()
+    }
+    ```
+  </Step>
+  
+  <Step title="Accept interfaces, return structs">
+    ```go
+    // ✅ Good: Accept interface, return concrete type
+    func NewServer(logger Logger) *Server {
+        return &Server{logger: logger}
+    }
+    
+    // ❌ Bad: Returning interface
+    func NewServer() Logger {
+        return &ConsoleLogger{}
+    }
+    ```
+  </Step>
+  
+  <Step title="Define interfaces where they're used">
+    Don't define interfaces in the same package as the implementation.
+    
+    ```text
+    ✅ Good:
+    service/
+      user_service.go      (defines UserStore interface)
+    repository/
+      user_repository.go   (implements UserStore)
+    
+    ❌ Bad:
+    repository/
+      interfaces.go        (defines UserStore)
+      user_repository.go   (implements UserStore)
+    ```
+  </Step>
+  
+  <Step title="Don't over-abstract">
+    Only create interfaces when you need flexibility. Don't add interfaces "just in case."
+    
+    <Note>
+      "A little copying is better than a little dependency" - Go Proverbs
+    </Note>
+  </Step>
+</Steps>
+
+## Testing with Interfaces
+
+Interfaces make testing incredibly simple:
+
+```go
+// Production code
+type UserStore interface {
+    Get(id int) (*User, error)
+}
+
+type UserService struct {
+    store UserStore
+}
+
+func (s *UserService) GetUser(id int) (*User, error) {
+    return s.store.Get(id)
+}
+
+// Test code
+type MockUserStore struct {
+    users map[int]*User
+}
+
+func (m *MockUserStore) Get(id int) (*User, error) {
+    if user, ok := m.users[id]; ok {
+        return user, nil
+    }
+    return nil, errors.New("not found")
+}
+
+// Test
+func TestGetUser(t *testing.T) {
+    mock := &MockUserStore{
+        users: map[int]*User{
+            1: {Name: "Alice"},
+        },
+    }
+    
+    service := &UserService{store: mock}
+    user, err := service.GetUser(1)
+    
+    if err != nil {
+        t.Fatal(err)
+    }
+    if user.Name != "Alice" {
+        t.Errorf("expected Alice, got %s", user.Name)
+    }
+}
+```
+
+## Common Interface Patterns
+
+<Accordion title="Repository Pattern">
+  ```go
+  type UserRepository interface {
+      Create(user *User) error
+      GetByID(id int) (*User, error)
+      Update(user *User) error
+      Delete(id int) error
+  }
+  
+  // PostgreSQL implementation
+  type PostgresUserRepo struct {
+      db *sql.DB
+  }
+  
+  // MongoDB implementation
+  type MongoUserRepo struct {
+      collection *mongo.Collection
+  }
+  ```
+</Accordion>
+
+<Accordion title="Strategy Pattern">
+  ```go
+  type PricingStrategy interface {
+      Calculate(price float64) float64
+  }
+  
+  type RegularPricing struct{}
+  func (r RegularPricing) Calculate(price float64) float64 {
+      return price
+  }
+  
+  type DiscountPricing struct {
+      discount float64
+  }
+  func (d DiscountPricing) Calculate(price float64) float64 {
+      return price * (1 - d.discount)
+  }
+  ```
+</Accordion>
+
+<Accordion title="Observer Pattern">
+  ```go
+  type Observer interface {
+      Update(event string)
+  }
+  
+  type Subject struct {
+      observers []Observer
+  }
+  
+  func (s *Subject) Attach(o Observer) {
+      s.observers = append(s.observers, o)
+  }
+  
+  func (s *Subject) Notify(event string) {
+      for _, observer := range s.observers {
+          observer.Update(event)
+      }
+  }
+  ```
+</Accordion>
+
+## Key Takeaways
+
+- Interfaces are satisfied **implicitly** in Go
+- "Accept interfaces, return structs" for flexible APIs
+- Keep interfaces **small** (1-3 methods ideal)
+- Define interfaces in the **consumer** package, not the provider
+- Use interfaces for **testing**, **polymorphism**, and **dependency injection**
+- Don't create interfaces until you need them
+
+## Next Steps
+
+- [Generics](/fundamentals/generics) - Type-safe code reuse with type parameters
+- [Error Handling](/advanced/error-handling) - Custom error types with interfaces

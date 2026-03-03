@@ -1,0 +1,76 @@
+---
+title: 'Projects Overview'
+description: 'Real-world applications built with Go during the learning journey'
+icon: 'folder-open'
+---
+
+## Introduction
+
+Welcome to the **Projects** section! After working through the fundamentals of Go—from runtime mechanics to web development—this chapter tracks the evolution of real-world applications.
+
+Unlike the previous chapters which focused on isolated concepts, these projects integrate multiple learnings:
+- Clean architecture patterns (from Chapter 10)
+- Authentication and authorization
+- Database interactions
+- HTTP routing and middleware
+- Graceful error handling
+
+Each project represents an ongoing journey, capturing both the successes and the inevitable work-in-progress moments that come with building production software.
+
+## Philosophy
+
+These projects follow the principle: **"Perfect is the enemy of done."**
+
+You'll find:
+- Skeleton code that shows intent
+- Incremental improvements over time
+- Real commits, real mistakes, real learning
+
+<Note>
+This documentation captures projects **as they are**, not as they "should be". The goal is authenticity over polish.
+</Note>
+
+## Active Projects
+
+<CardGroup cols={2}>
+  <Card
+    title="Attendance App"
+    icon="clipboard-check"
+    href="/projects/attendance-app"
+  >
+    A student-teacher attendance tracking system with role-based dashboards and authentication.
+  </Card>
+  
+  <Card
+    title="More Coming Soon"
+    icon="ellipsis"
+    iconType="solid"
+  >
+    Future projects will include game development with Raylib and other real-world applications.
+  </Card>
+</CardGroup>
+
+## Learning Outcomes
+
+By exploring these projects, you'll see:
+
+1. **Project Structure Evolution**: How the standard Go layout (`cmd/`, `internal/`, `pkg/`) applies to real applications
+2. **Integration Patterns**: Connecting routing, middleware, handlers, and services
+3. **Incremental Development**: How applications grow from empty `main()` functions to complete systems
+4. **Architectural Decisions**: Why certain patterns (like dependency injection) matter at scale
+
+<Info>
+These projects build directly on concepts from previous chapters. If something looks unfamiliar, check the cross-references to earlier sections.
+</Info>
+
+## Cross-References
+
+These projects leverage concepts from:
+- [Project Structure](/fundamentals/project-structure)
+- [Interfaces and Dependency Injection](/fundamentals/interfaces)
+- [REST APIs](/web/rest-api)
+- [Authentication and Clean Architecture](/web/authentication)
+
+---
+
+*Ready to explore? Start with the [Attendance App](/projects/attendance-app) to see these principles in action.*

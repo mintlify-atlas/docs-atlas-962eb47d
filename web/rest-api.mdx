@@ -1,0 +1,397 @@
+---
+title: 'REST API Development'
+description: 'Build a complete RESTful API with Go using Gorilla Mux for routing and JSON encoding'
+---
+
+## Overview
+
+This chapter demonstrates building a fully functional **RESTful API** for managing a movie collection. You'll learn how to structure REST endpoints, handle JSON data, work with HTTP methods, and use the Gorilla Mux router for dynamic URL parameters.
+
+<Note>
+This project is part of **Chapter 9: Web Basics** and serves as the foundation for understanding HTTP servers in Go.
+</Note>
+
+## What You'll Build
+
+A complete CRUD (Create, Read, Update, Delete) API that manages movies with directors. The API uses in-memory storage and demonstrates RESTful principles.
+
+## Key Concepts
+
+### 1. JSON Encoding in Go
+
+Go's `encoding/json` package provides powerful serialization capabilities. For a struct to be JSON-encodable, fields must be **exported** (capitalized).
+
+```go
+type Movie struct {
+    ID       string    `json:"id"`
+    Isbn     string    `json:"isbn"`
+    Title    string    `json:"title"`
+    Director *Director `json:"director"`
+}
+
+type Director struct {
+    Firstname string `json:"firstname"`
+    Lastname  string `json:"lastname"`
+}
+```
+
+<Warning>
+**Common Pitfall**: If struct fields are lowercase (unexported), they won't be visible to the JSON encoder. Always capitalize field names and use struct tags for JSON keys.
+</Warning>
+
+### 2. Gorilla Mux Router
+
+While Go's standard library provides `http.ServeMux`, Gorilla Mux offers advanced routing features like URL parameters, method-based routing, and regex patterns.
+
+```go
+import "github.com/gorilla/mux"
+
+r := mux.NewRouter()
+r.HandleFunc("/movies/{id}", getMovie).Methods("GET")
+```
+
+### 3. REST Endpoint Design
+
+The API follows REST conventions where:
+- Resource collections use plural nouns (`/movies`)
+- Individual resources include identifiers (`/movies/{id}`)
+- HTTP methods indicate the operation (GET, POST, PUT, DELETE)
+
+## REST Endpoints
+
+Here's the complete API specification:
+
+| Method | Endpoint | Description | Request Body | Response |
+| :--- | :--- | :--- | :--- | :--- |
+| **GET** | `/movies` | Get all movies | None | Array of movies |
+| **GET** | `/movies/{id}` | Get a specific movie by ID | None | Single movie object |
+| **POST** | `/movies` | Create a new movie | Movie JSON | Created movie |
+| **PUT** | `/movies/{id}` | Update an existing movie | Movie JSON | Updated movie |
+| **DELETE** | `/movies/{id}` | Delete a movie | None | Empty response |
+
+## Implementation
+
+### Step 1: Define Data Models
+
+Start by defining the data structures that represent your domain:
+
+```go main.go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "log"
+    "net/http"
+    
+    "github.com/gorilla/mux"
+)
+
+type Movie struct {
+    ID       string    `json:"id"`
+    Isbn     string    `json:"isbn"`
+    Title    string    `json:"title"`
+    Director *Director `json:"director"`
+}
+
+type Director struct {
+    Firstname string `json:"firstname"`
+    Lastname  string `json:"lastname"`
+}
+
+// In-memory storage
+var movies []Movie
+```
+
+### Step 2: Implement GET Operations
+
+<Tabs>
+  <Tab title="Get All Movies">
+    ```go
+    func getMovies(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(movies)
+    }
+    ```
+    
+    This handler:
+    1. Sets the `Content-Type` header to indicate JSON response
+    2. Encodes the entire movies slice directly to the response writer
+  </Tab>
+  
+  <Tab title="Get Single Movie">
+    ```go
+    func getMovie(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        params := mux.Vars(r)
+        
+        for _, movie := range movies {
+            if movie.ID == params["id"] {
+                json.NewEncoder(w).Encode(movie)
+                return
+            }
+        }
+    }
+    ```
+    
+    Key features:
+    - `mux.Vars(r)` extracts URL parameters
+    - Linear search through the movies slice
+    - Early return when movie is found
+  </Tab>
+</Tabs>
+
+### Step 3: Implement POST (Create)
+
+```go
+func createMovies(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    
+    var movie Movie
+    json.NewDecoder(r.Body).Decode(&movie)
+    
+    movies = append(movies, movie)
+    json.NewEncoder(w).Encode(movie)
+}
+```
+
+<Steps>
+  <Step title="Decode Request Body">
+    `json.NewDecoder(r.Body).Decode(&movie)` reads the request body and unmarshals JSON into the movie struct.
+  </Step>
+  
+  <Step title="Store the Movie">
+    Append the new movie to the in-memory slice.
+  </Step>
+  
+  <Step title="Return Created Resource">
+    Encode and return the created movie to confirm the operation.
+  </Step>
+</Steps>
+
+### Step 4: Implement PUT (Update)
+
+```go
+func updateMovies(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    params := mux.Vars(r)
+    
+    for index, movie := range movies {
+        if movie.ID == params["id"] {
+            // Remove old movie
+            movies = append(movies[:index], movies[index+1:]...)
+            
+            // Decode and add new movie
+            var movie Movie
+            json.NewDecoder(r.Body).Decode(&movie)
+            movies = append(movies, movie)
+            
+            json.NewEncoder(w).Encode(movie)
+            return
+        }
+    }
+}
+```
+
+<Note>
+This implementation uses a **replace** strategy: it removes the old entry and adds the new one. In production, you'd typically update fields in place.
+</Note>
+
+### Step 5: Implement DELETE
+
+```go
+func deleteMovies(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    params := mux.Vars(r)
+    
+    for index, movie := range movies {
+        if movie.ID == params["id"] {
+            movies = append(movies[:index], movies[index+1:]...)
+            break
+        }
+    }
+}
+```
+
+The slice manipulation `movies[:index]` and `movies[index+1:]` creates a new slice excluding the deleted element.
+
+### Step 6: Wire Up Routes and Start Server
+
+```go
+func main() {
+    r := mux.NewRouter()
+    
+    // Seed data
+    movies = append(movies, Movie{
+        ID:    "1",
+        Isbn:  "438227",
+        Title: "Movie One",
+        Director: &Director{
+            Firstname: "John",
+            Lastname:  "Doe",
+        },
+    })
+    movies = append(movies, Movie{
+        ID:    "2",
+        Isbn:  "454555",
+        Title: "Movie Two",
+        Director: &Director{
+            Firstname: "Steve",
+            Lastname:  "Smith",
+        },
+    })
+    
+    // Register routes
+    r.HandleFunc("/movies", getMovies).Methods("GET")
+    r.HandleFunc("/movies/{id}", getMovie).Methods("GET")
+    r.HandleFunc("/movies", createMovies).Methods("POST")
+    r.HandleFunc("/movies/{id}", updateMovies).Methods("PUT")
+    r.HandleFunc("/movies/{id}", deleteMovies).Methods("DELETE")
+    
+    fmt.Printf("Starting server at port 8000\n")
+    log.Fatal(http.ListenAndServe(":8000", r))
+}
+```
+
+## Testing the API
+
+### Using cURL
+
+<CodeGroup>
+```bash Get All Movies
+curl http://localhost:8000/movies
+```
+
+```bash Get Single Movie
+curl http://localhost:8000/movies/1
+```
+
+```bash Create Movie
+curl -X POST http://localhost:8000/movies \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "3",
+    "isbn": "123456",
+    "title": "Inception",
+    "director": {
+      "firstname": "Christopher",
+      "lastname": "Nolan"
+    }
+  }'
+```
+
+```bash Update Movie
+curl -X PUT http://localhost:8000/movies/3 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "3",
+    "isbn": "123456",
+    "title": "Inception - Extended",
+    "director": {
+      "firstname": "Christopher",
+      "lastname": "Nolan"
+    }
+  }'
+```
+
+```bash Delete Movie
+curl -X DELETE http://localhost:8000/movies/3
+```
+</CodeGroup>
+
+## Running the Project
+
+<Steps>
+  <Step title="Install Dependencies">
+    ```bash
+    cd CRUD
+    go mod init your-module-name
+    go get github.com/gorilla/mux
+    ```
+  </Step>
+  
+  <Step title="Run the Server">
+    ```bash
+    go run main.go
+    ```
+    
+    You should see: `Starting server at port 8000`
+  </Step>
+  
+  <Step title="Test Endpoints">
+    Open another terminal and test the endpoints using cURL or a tool like Postman.
+  </Step>
+</Steps>
+
+## Important Concepts
+
+### Content-Type Header
+
+Always set `Content-Type` to inform clients about the response format:
+
+```go
+w.Header().Set("Content-Type", "application/json")
+```
+
+### Request Body Decoding
+
+Go provides a streaming decoder that reads directly from the request:
+
+```go
+var movie Movie
+json.NewDecoder(r.Body).Decode(&movie)
+```
+
+This is more efficient than reading the entire body into memory first.
+
+### URL Parameters
+
+Gorilla Mux makes extracting URL parameters simple:
+
+```go
+params := mux.Vars(r)  // Returns map[string]string
+id := params["id"]
+```
+
+### Method Filtering
+
+Restrict handlers to specific HTTP methods:
+
+```go
+r.HandleFunc("/movies", getMovies).Methods("GET")
+r.HandleFunc("/movies", createMovies).Methods("POST")
+```
+
+## Best Practices
+
+<Warning>
+**Production Considerations**: This example uses in-memory storage which resets on server restart. Real applications should use a database.
+</Warning>
+
+1. **Error Handling**: Add proper error handling for JSON decode operations
+2. **Validation**: Validate incoming data before processing
+3. **Status Codes**: Return appropriate HTTP status codes (201 for created, 404 for not found)
+4. **ID Generation**: Use UUIDs or database auto-increment instead of client-provided IDs
+5. **Middleware**: Add logging, authentication, and CORS middleware
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="HTML Forms" icon="wpforms" href="/web/forms">
+    Learn how to handle HTML form submissions
+  </Card>
+  <Card title="Authentication" icon="lock" href="/web/authentication">
+    Add JWT authentication to your APIs
+  </Card>
+</CardGroup>
+
+## Summary
+
+You've learned:
+- How to structure a RESTful API in Go
+- Working with JSON encoding/decoding
+- Using Gorilla Mux for advanced routing
+- Implementing CRUD operations
+- Handling HTTP methods and URL parameters
+
+This foundation prepares you for more advanced web development topics including authentication, middleware, and database integration.

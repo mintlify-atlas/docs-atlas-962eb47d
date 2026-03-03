@@ -1,0 +1,412 @@
+---
+title: 'The Go Runtime'
+description: 'Deep dive into Stack vs Heap, Garbage Collection, sync.Pool, unsafe, and profiling with pprof'
+---
+
+## Overview
+
+Before writing more code, it's critical to understand **how Go actually executes it**. This chapter covers the hidden mechanisms of the Go runtime: memory management, the garbage collector, and performance tuning.
+
+<Note>
+  Understanding these concepts transforms you from writing "random Go code" to writing code that cooperates with the runtime for optimal performance.
+</Note>
+
+## Stack vs Heap (Escape Analysis)
+
+Imagine every function in Go is a **small room**. When you create a variable, Go has to decide:
+
+> "Can this thing stay inside the room, or do I need to put it outside where everyone can reach it?"
+
+### Memory Locations
+
+<Tabs>
+  <Tab title="Stack (The Room)">
+    If Go is 100% sure the variable is used **only** inside that room, it keeps it on the stack.
+    
+    **Characteristics:**
+    - When you leave the room (function returns), the variable is gone
+    - Fast allocation and deallocation
+    - No garbage collection overhead
+    - Limited in size
+    
+    ```go
+    func calculate() int {
+        x := 42  // Stays on stack
+        y := x * 2
+        return y
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Heap (The Outside)">
+    If Go is not sure—even a little bit unsure—it moves the variable to the heap so it doesn't disappear too early.
+    
+    **Characteristics:**
+    - Persists beyond function scope
+    - Requires garbage collection
+    - Slower allocation
+    - Can grow dynamically
+    
+    ```go
+    func createUser() *User {
+        u := &User{Name: "Alice"}  // Escapes to heap
+        return u
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Escape Analysis in Action
+
+**Escape Analysis** is Go's compile-time decision process. To see this in action:
+
+```bash
+go build -gcflags="-m" .
+```
+
+Go will literally tell you what it decided and why:
+
+```text
+./main.go:5:6: can inline calculate
+./main.go:11:6: cannot inline createUser
+./main.go:12:7: &User{...} escapes to heap
+```
+
+<Warning>
+  If you don't look at escape analysis output, you're guessing about performance. Excessive heap allocations can significantly slow down your program.
+</Warning>
+
+### Common Escape Scenarios
+
+<Accordion title="When Variables Escape to Heap">
+  1. **Returning Pointers**
+  ```go
+  func newCounter() *int {
+      count := 0
+      return &count  // ❌ Escapes
+  }
+  ```
+  
+  2. **Interface Conversions**
+  ```go
+  func log(v interface{}) {
+      fmt.Println(v)
+  }
+  
+  x := 42
+  log(x)  // ❌ x escapes (interface{} can hold anything)
+  ```
+  
+  3. **Closures**
+  ```go
+  func counter() func() int {
+      count := 0
+      return func() int {  // ❌ count escapes (outlives function)
+          count++
+          return count
+      }
+  }
+  ```
+  
+  4. **Slices Growing Beyond Known Size**
+  ```go
+  func makeSlice(n int) []int {
+      s := make([]int, n)  // ❌ May escape if n is not constant
+      return s
+  }
+  ```
+</Accordion>
+
+## Garbage Collector (GC)
+
+Imagine the **Heap** is a **playground**:
+- **Objects**: Kids running around
+- **Garbage**: Forgotten toys lying around
+
+### How the GC Works
+
+The **Garbage Collector** is a cleaning robot that walks around while kids are still playing. It checks:
+
+> "Is anyone still holding this toy?"
+- **Yes** → Leave it
+- **No** → Pick it up and throw it away
+
+<Steps>
+  <Step title="Mark Phase">
+    The GC traces from root objects (goroutine stacks, global variables) and marks all reachable objects.
+  </Step>
+  
+  <Step title="Sweep Phase">
+    The GC reclaims memory from unmarked objects that are no longer reachable.
+  </Step>
+  
+  <Step title="Concurrent Collection">
+    Go's GC runs concurrently with your application, but sometimes it needs brief "Stop-The-World" pauses.
+  </Step>
+</Steps>
+
+### The Cost of Garbage Collection
+
+<Warning>
+  The GC gets tired if you keep throwing new toys on the ground every second. Lots of tiny heap allocations slow programs down, even if memory looks "free".
+</Warning>
+
+**Performance Impact:**
+```go
+// ❌ Bad: Creates garbage every iteration
+for i := 0; i < 1000000; i++ {
+    data := fmt.Sprintf("item-%d", i)  // Allocates on heap
+    process(data)
+}
+
+// ✅ Better: Reuse buffers
+var buf bytes.Buffer
+for i := 0; i < 1000000; i++ {
+    buf.Reset()
+    fmt.Fprintf(&buf, "item-%d", i)
+    process(buf.String())
+}
+```
+
+## sync.Pool
+
+Imagine instead of throwing toys away, you have a **shared toy box**. When a kid finishes playing, they put it back in the box instead of throwing it away. The next kid reuses it.
+
+### sync.Pool is NOT a Cache
+
+<Note>
+  A cache is like a fridge: you put food in and expect it to be there later.
+  
+  `sync.Pool` is a **Recycling Bin**:
+  - You throw something in, maybe someone reuses it
+  - The GC is allowed to empty the bin whenever it wants
+</Note>
+
+### The Golden Rule
+
+**Your program must behave exactly the same if the pool were always empty.**
+
+<CodeGroup>
+```go Good Usage
+var bufferPool = sync.Pool{
+    New: func() interface{} {
+        return new(bytes.Buffer)
+    },
+}
+
+func processData(data []byte) {
+    buf := bufferPool.Get().(*bytes.Buffer)
+    defer bufferPool.Put(buf)
+    
+    buf.Reset()  // Always reset before use!
+    buf.Write(data)
+    // ... process buffer ...
+}
+```
+
+```go Bad Usage
+var connPool = sync.Pool{  // ❌ DON'T DO THIS
+    New: func() interface{} {
+        return openDatabaseConnection()
+    },
+}
+
+// Problem: Connections might be lost during GC!
+// Use a proper connection pool instead
+```
+</CodeGroup>
+
+### When to Use sync.Pool
+
+**Good use cases:**
+- Temporary buffers (`bytes.Buffer`, `strings.Builder`)
+- Encoding/decoding scratch space
+- Frequently allocated, short-lived objects
+
+**Bad use cases:**
+- Database connections
+- User sessions
+- Configuration objects
+- Anything that must persist
+
+## unsafe Package
+
+Normally, Go acts like a strict parent, checking types and memory to make sure you don't hurt yourself.
+
+**unsafe** is Go saying:
+> "Fine. You know what you're doing. I won't stop you."
+
+<Warning>
+  Using `unsafe` is like giving scissors to a kid. You can do useful things (like direct memory manipulation for performance), but one wrong move can silently corrupt your program in ways you won't notice until much later.
+</Warning>
+
+### Common Uses of unsafe
+
+<Tabs>
+  <Tab title="Type Conversion">
+    ```go
+    import "unsafe"
+    
+    func stringToBytes(s string) []byte {
+        // ⚠️ Dangerous: No copy, but []byte should not be modified!
+        return unsafe.Slice(unsafe.StringData(s), len(s))
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Memory Layout">
+    ```go
+    type MyStruct struct {
+        a int32
+        b int64
+    }
+    
+    func main() {
+        var s MyStruct
+        // Get memory offset of field b
+        offset := unsafe.Offsetof(s.b)
+        fmt.Println(offset)  // Likely 8 (due to alignment)
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Zero-Copy Casting">
+    ```go
+    // Cast slice of one type to another (same size)
+    func int32ToBytes(nums []int32) []byte {
+        return unsafe.Slice(
+            (*byte)(unsafe.Pointer(&nums[0])),
+            len(nums)*4,
+        )
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Rules for Safe Use of unsafe
+
+1. **Read the documentation** - The `unsafe` package docs are critical
+2. **Understand alignment** - Different architectures have different requirements
+3. **Keep it localized** - Isolate unsafe code in well-tested packages
+4. **Add comments** - Explain why unsafe is necessary
+5. **Benchmark first** - Make sure the performance gain justifies the risk
+
+## pprof: The Truth About Performance
+
+Imagine your program is a city, and it feels slow. You *think* traffic is the problem, but you're guessing.
+
+**pprof** is a helicopter camera. It shows you:
+- Where time is **actually** being spent
+- Where memory is **actually** being allocated
+
+### Enabling Profiling
+
+<CodeGroup>
+```go CPU Profiling
+import (
+    "os"
+    "runtime/pprof"
+)
+
+func main() {
+    f, _ := os.Create("cpu.prof")
+    pprof.StartCPUProfile(f)
+    defer pprof.StopCPUProfile()
+    
+    // Your code here
+}
+```
+
+```go Memory Profiling
+import (
+    "os"
+    "runtime/pprof"
+)
+
+func main() {
+    defer func() {
+        f, _ := os.Create("mem.prof")
+        pprof.WriteHeapProfile(f)
+        f.Close()
+    }()
+    
+    // Your code here
+}
+```
+
+```go HTTP Server
+import (
+    _ "net/http/pprof"  // Registers /debug/pprof/* handlers
+    "net/http"
+)
+
+func main() {
+    go func() {
+        http.ListenAndServe("localhost:6060", nil)
+    }()
+    
+    // Your application...
+}
+```
+</CodeGroup>
+
+### Analyzing Profiles
+
+```bash
+# CPU profile
+go tool pprof cpu.prof
+
+# Memory profile  
+go tool pprof mem.prof
+
+# Live profiling from HTTP server
+go tool pprof http://localhost:6060/debug/pprof/heap
+
+# Generate visual graph
+go tool pprof -http=:8080 cpu.prof
+```
+
+<Note>
+  Without pprof, performance tuning is just "vibes". With it, you can pinpoint the exact line causing 90% of the garbage or CPU time.
+</Note>
+
+## The Unified Theory
+
+Go is constantly trying to keep things simple, fast, and safe:
+
+<Steps>
+  <Step title="Escape Analysis decides where things live">
+    Stack (fast) vs Heap (flexible but slower)
+  </Step>
+  
+  <Step title="Heap Objects create work for the GC">
+    Minimize allocations to reduce GC pressure
+  </Step>
+  
+  <Step title="sync.Pool reduces garbage creation">
+    Reuse temporary objects instead of allocating new ones
+  </Step>
+  
+  <Step title="unsafe lets you break rules when you must">
+    But only when you fully understand the consequences
+  </Step>
+  
+  <Step title="pprof tells you the truth when intuition lies">
+    Always measure before optimizing
+  </Step>
+</Steps>
+
+## Best Practices
+
+1. **Profile first, optimize second** - Don't guess at performance bottlenecks
+2. **Prefer stack allocation** - Design APIs to avoid unnecessary heap escapes
+3. **Reuse buffers** - Use `sync.Pool` for temporary objects
+4. **Minimize allocations** - Preallocate slices and maps when sizes are known
+5. **Avoid `unsafe` until necessary** - Readable, safe code is usually fast enough
+6. **Monitor GC metrics** - Use `GODEBUG=gctrace=1` to see GC behavior
+
+## Next Steps
+
+- [Methods](/fundamentals/methods) - Learn how to attach behavior to types
+- [Interfaces](/fundamentals/interfaces) - Master polymorphism in Go
+- [Concurrency](/advanced/concurrency) - Goroutines and channels with runtime awareness

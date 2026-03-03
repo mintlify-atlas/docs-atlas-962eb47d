@@ -1,80 +1,323 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick Start"
+description: "Get Go installed and run your first web server in minutes"
 ---
 
-## Get started in three steps
+## Get Started in Three Steps
 
-Get your documentation site running locally and make your first customization.
+Go from zero to running a real web server with routing in under 5 minutes.
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Install Go">
+    Download and install Go from the official website:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    <CodeGroup>
+    ```bash macOS (Homebrew)
+    brew install go
+    ```
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    ```bash Linux
+    wget https://go.dev/dl/go1.25.5.linux-amd64.tar.gz
+    sudo tar -C /usr/local -xzf go1.25.5.linux-amd64.tar.gz
+    export PATH=$PATH:/usr/local/go/bin
+    ```
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash Windows
+    # Download the installer from https://go.dev/dl/
+    # Run the .msi file and follow the installation wizard
+    ```
+    </CodeGroup>
+    
+    Verify your installation:
+    ```bash
+    go version
+    # Should output: go version go1.25.5 (or similar)
+    ```
+  </Step>
+  
+  <Step title="Clone the Repository">
+    Clone the Go Journey repository to get all the example projects:
+    
+    ```bash
+    git clone https://github.com/priyanshu-samal/Go.git
+    cd Go/Intro
+    ```
+    
+    <Tip>
+      The `Intro` directory contains a complete project demonstrating proper Go project structure with `cmd/` and `internal/` directories.
+    </Tip>
+  </Step>
+  
+  <Step title="Run Your First Server">
+    Start the web server:
+    
+    ```bash
+    go run cmd/intro/main.go
+    ```
+    
+    You should see:
+    ```
+    Server started. Listening on http://localhost:8080
+    ```
+    
+    Open your browser to `http://localhost:8080` and you'll see:
+    ```
+    Welcome to the Intro Application!
+    ```
+    
+    Try the API endpoint at `http://localhost:8080/api/data` to see sample data.
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Check>
+  **Success!** You've just run your first Go web server with routing.
+</Check>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+## Understanding the Code
 
-### Step 3: Go live
+Let's break down what you just ran. The Intro project demonstrates Go's standard project layout.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+### Project Structure
 
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+```
+Intro/
+├── cmd/
+│   └── intro/
+│       └── main.go      # Application entry point
+├── internal/
+│   └── routes/
+│       └── routes.go    # HTTP routing logic
+└── go.mod               # Module definition
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **Why this structure?** 
+  - `cmd/` contains application entry points (main packages)
+  - `internal/` contains private application code that can't be imported by external projects
+  - This is the Go community's preferred layout for production applications
+</Note>
+
+### The Entry Point
+
+The `cmd/intro/main.go` file is where your application starts:
+
+```go cmd/intro/main.go
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "github.com/priyanshu-samal/Intro/internal/routes"
+)
+
+func main() {
+    router := routes.NewRouter()  // Create router from internal package
+
+    port := ":8080"
+    addr := fmt.Sprintf("Listening on http://localhost%s", port)
+    fmt.Printf(`Server started. %s`, addr)
+    
+    if err := http.ListenAndServe(port, router); err != nil {
+        fmt.Printf("Failed to start server: %v", err)
+    }
+}
+```
+
+<Accordion title="Code Breakdown" icon="magnifying-glass">
+  - **`package main`**: Tells Go this is an executable program (not a library)
+  - **`routes.NewRouter()`**: Gets a router from our internal package
+  - **`http.ListenAndServe()`**: Starts the HTTP server on port 8080
+  - **Error handling**: Go returns errors as values, not exceptions
+</Accordion>
+
+### The Router Logic
+
+The `internal/routes/routes.go` file handles HTTP routing:
+
+```go internal/routes/routes.go
+package routes
+
+import (
+    "net/http"
+    "fmt"
+)
+
+func NewRouter() *http.ServeMux {
+    mux := http.NewServeMux()
+    mux.HandleFunc("/", indexHandler)
+    mux.HandleFunc("/api/data", apiDataHandler)
+    return mux
+}
+
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintln(w, "Welcome to the Intro Application!")
+}
+
+func apiDataHandler(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Sample Data: %v", "Hello from API")
+}
+```
+
+<Accordion title="How Routing Works" icon="route">
+  - **`http.ServeMux`**: Go's built-in HTTP request router
+  - **`HandleFunc`**: Registers a handler function for a specific URL pattern
+  - **Handler signature**: All handlers take `(w http.ResponseWriter, r *http.Request)`
+  - **Response writing**: Use `fmt.Fprintln(w, ...)` to send data back to the client
+</Accordion>
+
+## What You Just Learned
+
+<AccordionGroup>
+  <Accordion title="Go Modules" icon="box">
+    The `go.mod` file defines your module path and Go version:
+    ```go
+    module github.com/priyanshu-samal/intro
+    
+    go 1.25.5
+    ```
+    This enables dependency management and allows other projects to import your code.
+  </Accordion>
+  
+  <Accordion title="Package Organization" icon="folder-tree">
+    - Every folder in Go is a package
+    - All files in a folder must declare the same package name
+    - `package main` creates an executable
+    - Other package names create libraries
+  </Accordion>
+  
+  <Accordion title="Import Paths" icon="file-import">
+    When you import code, you use the full module path:
+    ```go
+    import "github.com/priyanshu-samal/Intro/internal/routes"
+    ```
+    Go's toolchain enforces that `internal/` packages can't be imported by external modules.
+  </Accordion>
+  
+  <Accordion title="HTTP Handlers" icon="globe">
+    Go's standard library includes a production-ready HTTP server:
+    - No external dependencies required
+    - Fast and concurrent by default (each request in its own goroutine)
+    - Simple handler interface: just a function taking `ResponseWriter` and `Request`
+  </Accordion>
+</AccordionGroup>
+
+## Try These Experiments
+
+Now that you have a working server, try making some changes:
+
+<CardGroup cols={2}>
+  <Card title="Add a New Route" icon="plus">
+    Open `internal/routes/routes.go` and add:
+    ```go
+    mux.HandleFunc("/hello", helloHandler)
+    ```
+    Then create the handler:
+    ```go
+    func helloHandler(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintln(w, "Hello, Go Journey!")
+    }
+    ```
+    Restart the server and visit `http://localhost:8080/hello`
+  </Card>
+  
+  <Card title="Return JSON" icon="brackets-curly">
+    Add JSON support to your API:
+    ```go
+    import "encoding/json"
+    
+    func apiDataHandler(w http.ResponseWriter, r *http.Request) {
+        data := map[string]string{"message": "Hello", "status": "ok"}
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(data)
+    }
+    ```
+  </Card>
+  
+  <Card title="Change the Port" icon="network-wired">
+    In `cmd/intro/main.go`, change:
+    ```go
+    port := ":3000"  // Instead of :8080
+    ```
+    Now your server runs on port 3000.
+  </Card>
+  
+  <Card title="Build a Binary" icon="file-zipper">
+    Compile your code into an executable:
+    ```bash
+    go build -o myserver cmd/intro/main.go
+    ./myserver
+    ```
+    You now have a standalone binary with no dependencies!
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+Now that you have Go running, it's time to dive deeper:
+
+<CardGroup cols={2}>
+  <Card title="Project Structure" icon="folder-tree" href="/fundamentals/project-structure">
+    Understand why we organize code with `cmd/` and `internal/` directories
+  </Card>
+  
+  <Card title="The Go Runtime" icon="microchip" href="/fundamentals/runtime">
+    Learn how Go manages memory, garbage collection, and escape analysis
+  </Card>
+  
+  <Card title="Methods & Receivers" icon="function" href="/fundamentals/methods">
+    Master the difference between value and pointer receivers
+  </Card>
+  
+  <Card title="Build a REST API" icon="globe" href="/web/rest-api">
+    Create a full CRUD API with JSON, routing, and database integration
+  </Card>
+</CardGroup>
+
+<Tip>
+  **Pro Tip**: Each chapter in the Go Journey repository is a complete, runnable project. Navigate to any chapter directory and run `go run` to see it in action.
+</Tip>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Port Already in Use" icon="triangle-exclamation">
+    If you see `bind: address already in use`, another process is using port 8080.
+    
+    Solution: Either kill that process or change the port in `main.go`:
+    ```go
+    port := ":3000"  // Use a different port
+    ```
+  </Accordion>
+  
+  <Accordion title="Go Command Not Found" icon="circle-xmark">
+    If `go version` doesn't work, Go isn't in your PATH.
+    
+    Solution: Add Go to your PATH (usually done automatically by the installer):
+    ```bash
+    export PATH=$PATH:/usr/local/go/bin
+    ```
+    Add this to your `~/.bashrc` or `~/.zshrc` to make it permanent.
+  </Accordion>
+  
+  <Accordion title="Module Not Found" icon="magnifying-glass">
+    If you see module import errors, make sure you're in the correct directory:
+    ```bash
+    cd Go/Intro  # Must be in the Intro directory
+    go run cmd/intro/main.go
+    ```
+  </Accordion>
+  
+  <Accordion title="Hot Reload Not Working" icon="arrows-rotate">
+    Go doesn't have built-in hot reload. You must restart after changes.
+    
+    Solution: Use a tool like [air](https://github.com/cosmtrek/air) for automatic reloading:
+    ```bash
+    go install github.com/cosmtrek/air@latest
+    air  # Watches files and rebuilds automatically
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  **Need Help?** Join the Go community on [r/golang](https://reddit.com/r/golang), [Gophers Slack](https://gophers.slack.com), or check out the [official Go documentation](https://go.dev/doc/).
 </Note>

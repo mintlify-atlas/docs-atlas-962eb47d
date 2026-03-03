@@ -1,0 +1,247 @@
+---
+title: 'Project Structure'
+description: 'Learn the standard Go project layout with modules, packages, and the internal directory pattern'
+---
+
+## Overview
+
+The **Intro** project demonstrates how to set up a "proper" Go workspace following the standard project layout preferred by the Go community. Rather than writing a single `main.go` file, this guide shows you how to structure your code for scalability and maintainability.
+
+## Why Project Structure Matters
+
+A well-organized Go project:
+- Makes your code easier to navigate and understand
+- Enforces encapsulation through the `internal/` directory
+- Allows you to build multiple binaries from the same codebase
+- Follows community conventions that other Go developers recognize
+
+## Key Concepts
+
+<Steps>
+  <Step title="Go Modules (go.mod)">
+    The `go.mod` file defines your module's path and dependencies. It enables reliable version management and imports.
+    
+    ```go go.mod
+    module github.com/priyanshu-samal/into
+    
+    go 1.25.5
+    ```
+    
+    Create a new module with:
+    ```bash
+    go mod init github.com/your-username/your-project
+    ```
+  </Step>
+
+  <Step title="Standard Directory Layout">
+    Go projects follow a conventional structure:
+    
+    - **`cmd/`** - Contains the main entry point(s) of your application. The directory name usually matches the desired executable name (e.g., `cmd/intro` builds to `intro` or `intro.exe`)
+    - **`internal/`** - Contains private application code. Go's toolchain enforces that code inside `internal` cannot be imported by external modules, ensuring better encapsulation
+    - **`pkg/`** (optional) - Contains library code that can be imported by external projects
+  </Step>
+
+  <Step title="Packages">
+    In Go, every folder is a package. All files within a single folder must belong to the same package.
+    
+    <Note>
+      Package names should be short, lowercase, and match the directory name. Avoid underscores or mixed caps.
+    </Note>
+  </Step>
+</Steps>
+
+## Folder Structure
+
+A clean Go project looks like this:
+
+```text
+Intro/
+├── go.mod              # Module definition
+├── cmd/
+│   └── intro/
+│       └── main.go     # Entry point (package main)
+└── internal/
+    └── routes/
+        └── routes.go   # Business logic (package routes)
+```
+
+<Accordion title="Visual Representation">
+  ```mermaid
+  graph TD
+      Root[Intro/] --> Mod[go.mod]
+      Root --> Cmd[cmd/]
+      Root --> Internal[internal/]
+      Cmd --> App[intro/]
+      App --> Main[main.go]
+      Internal --> Pkg[routes/]
+      Pkg --> Lib[routes.go]
+      
+      style Root fill:#e1f5fe,stroke:#01579b
+      style Cmd fill:#fff9c4,stroke:#fbc02d
+      style Internal fill:#ffe0b2,stroke:#f57c00
+  ```
+</Accordion>
+
+## Code Walkthrough
+
+### The Entry Point
+
+The `cmd/intro/main.go` file is the "face" of your application. It belongs to `package main`, which tells the Go compiler to create an executable.
+
+```go cmd/intro/main.go
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"github.com/priyanshu-samal/Intro/internal/routes"
+)
+
+func main() {
+	router := routes.NewRouter()
+
+	port := ":8080"
+	addr := fmt.Sprintf("Listening on http://localhost%s", port)
+	fmt.Printf(`Server started. %s`, addr)
+	if err := http.ListenAndServe(port, router); err != nil {
+		fmt.Printf("Failed to start server: %v", err)
+	}
+}
+```
+
+<Note>
+  Notice how we import our internal package using the full module path: `github.com/priyanshu-samal/Intro/internal/routes`
+</Note>
+
+### The Logic Package
+
+The `internal/routes/routes.go` file contains the business logic. By placing it in `internal/`, we signal that this code is specific to our application.
+
+```go internal/routes/routes.go
+package routes
+
+import (
+	"net/http"
+	"fmt"
+)
+
+func NewRouter() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", indexHandler) 
+	mux.HandleFunc("/api/data", apiDataHandler)
+	return mux
+}
+
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "Welcome to the Intro Application!")
+}
+
+func apiDataHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Sample Data: %v", "demo")
+}
+```
+
+## How It Works
+
+<Tabs>
+  <Tab title="Running">
+    When you run your application:
+    
+    ```bash
+    go run cmd/intro/main.go
+    ```
+    
+    Go compiles the `main` package and links it with the imported `routes` package.
+  </Tab>
+  
+  <Tab title="Building">
+    To create a standalone binary:
+    
+    ```bash
+    go build -o bin/intro ./cmd/intro
+    ```
+    
+    This creates an executable in the `bin/` directory.
+    
+    <Warning>
+      Make sure to add `bin/` to your `.gitignore` file to avoid committing binaries to version control.
+    </Warning>
+  </Tab>
+  
+  <Tab title="Testing">
+    Organize tests alongside your code:
+    
+    ```text
+    internal/routes/
+    ├── routes.go
+    └── routes_test.go
+    ```
+    
+    Run all tests:
+    ```bash
+    go test ./...
+    ```
+  </Tab>
+</Tabs>
+
+## The `internal` Directory Pattern
+
+The `internal` directory is special in Go:
+
+<CodeGroup>
+```go Valid Import (same module)
+// Inside github.com/priyanshu-samal/Intro
+import "github.com/priyanshu-samal/Intro/internal/routes"
+```
+
+```go Invalid Import (external module)
+// Inside github.com/someone-else/other-project
+import "github.com/priyanshu-samal/Intro/internal/routes"
+// ❌ Error: use of internal package not allowed
+```
+</CodeGroup>
+
+This enforces encapsulation at the language level, making it impossible for external projects to depend on your internal implementation details.
+
+## Best Practices
+
+<Steps>
+  <Step title="Keep main.go minimal">
+    Your `main.go` should primarily wire up dependencies and start the application. Business logic belongs in packages.
+  </Step>
+  
+  <Step title="Use meaningful package names">
+    Package names should describe what the code does, not what it is:
+    - Good: `routes`, `users`, `auth`
+    - Bad: `helpers`, `utils`, `common`
+  </Step>
+  
+  <Step title="Organize by domain, not by type">
+    Structure code by business domain rather than technical patterns:
+    
+    ```text
+    ✅ Good
+    internal/
+    ├── users/
+    │   ├── handler.go
+    │   ├── service.go
+    │   └── repository.go
+    └── orders/
+        ├── handler.go
+        └── service.go
+    
+    ❌ Bad
+    internal/
+    ├── handlers/
+    ├── services/
+    └── repositories/
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+Now that you understand project structure, you're ready to learn about:
+- [The Go Runtime](/fundamentals/runtime) - How Go manages memory and executes your code
+- [Methods](/fundamentals/methods) - Attaching behavior to your types
+- [Interfaces](/fundamentals/interfaces) - Writing flexible, testable code

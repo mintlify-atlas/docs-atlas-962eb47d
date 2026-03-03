@@ -1,0 +1,493 @@
+---
+title: 'Working with HTML Forms'
+description: 'Master HTML form handling in Go including parsing, validation, and processing user input'
+---
+
+## Overview
+
+HTML forms are the traditional way users submit data to web servers. This chapter covers how to receive, parse, and validate form data in Go using the standard library's built-in form parsing capabilities.
+
+<Note>
+Form handling is a fundamental web development skill that bridges the gap between HTML frontends and Go backends.
+</Note>
+
+## Key Concepts
+
+### Form Submission Methods
+
+Forms can be submitted using two primary HTTP methods:
+
+- **POST**: Data is sent in the request body (preferred for sensitive data)
+- **GET**: Data is sent in the URL query string (good for searches, bookmarkable URLs)
+
+### Form Encoding
+
+By default, HTML forms use `application/x-www-form-urlencoded` encoding. Go's `r.ParseForm()` handles this automatically.
+
+## Basic Form Handling (POST)
+
+Let's look at a complete example that processes a POST form submission:
+
+```go main.go
+package main
+
+import (
+    "fmt"
+    "net/http"
+)
+
+func submit(w http.ResponseWriter, r *http.Request) {
+    // 1. Check HTTP method
+    if r.Method != http.MethodPost {
+        w.WriteHeader(http.StatusMethodNotAllowed)
+        return
+    }
+    
+    // 2. Parse the form data
+    err := r.ParseForm()
+    if err != nil {
+        http.Error(w, "error parsing form", http.StatusBadRequest)
+        return
+    }
+    
+    // 3. Extract form values
+    name := r.FormValue("name")
+    email := r.FormValue("email")
+    thought := r.FormValue("thought")
+    
+    // 4. Validate required fields
+    if name == "" || email == "" || thought == "" {
+        http.Error(w, "all fields are required", http.StatusBadRequest)
+        return
+    }
+    
+    // 5. Process the data
+    fmt.Println("Name:", name)
+    fmt.Println("Email:", email)
+    fmt.Println("Thought:", thought)
+    
+    // 6. Send response
+    w.Write([]byte("Form submitted successfully"))
+}
+
+func main() {
+    http.HandleFunc("/submit", submit)
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+## Step-by-Step Breakdown
+
+<Steps>
+  <Step title="Method Validation">
+    Always verify the HTTP method to prevent incorrect submissions:
+    
+    ```go
+    if r.Method != http.MethodPost {
+        w.WriteHeader(http.StatusMethodNotAllowed)
+        return
+    }
+    ```
+    
+    This returns HTTP 405 if the client uses GET, PUT, DELETE, etc.
+  </Step>
+  
+  <Step title="Parse Form Data">
+    Call `r.ParseForm()` to populate the `r.Form` map:
+    
+    ```go
+    err := r.ParseForm()
+    if err != nil {
+        http.Error(w, "error parsing form", http.StatusBadRequest)
+        return
+    }
+    ```
+    
+    <Warning>
+    **Critical**: You must call `ParseForm()` before accessing form values, or `r.FormValue()` will return empty strings.
+    </Warning>
+  </Step>
+  
+  <Step title="Extract Values">
+    Use `r.FormValue(key)` to retrieve form fields:
+    
+    ```go
+    name := r.FormValue("name")
+    email := r.FormValue("email")
+    thought := r.FormValue("thought")
+    ```
+    
+    This method automatically calls `ParseForm()` if it hasn't been called, but explicit parsing is better for error handling.
+  </Step>
+  
+  <Step title="Validate Input">
+    Always validate user input:
+    
+    ```go
+    if name == "" || email == "" || thought == "" {
+        http.Error(w, "all fields are required", http.StatusBadRequest)
+        return
+    }
+    ```
+    
+    In production, add more sophisticated validation (email format, length limits, etc.).
+  </Step>
+  
+  <Step title="Process and Respond">
+    Handle the validated data and send an appropriate response:
+    
+    ```go
+    fmt.Println("Name:", name)
+    fmt.Println("Email:", email)
+    fmt.Println("Thought:", thought)
+    
+    w.Write([]byte("Form submitted successfully"))
+    ```
+  </Step>
+</Steps>
+
+## GET Method Form Handling
+
+For GET requests, form data appears in the URL query string. Here's how to handle it:
+
+```go main.go
+package main
+
+import "net/http"
+
+func submit(w http.ResponseWriter, r *http.Request) {
+    // Validate method
+    if r.Method != http.MethodGet {
+        w.WriteHeader(http.StatusMethodNotAllowed)
+        return
+    }
+    
+    // Parse form/query parameters
+    err := r.ParseForm()
+    if err != nil {
+        http.Error(w, "nothing found", http.StatusBadGateway)
+        return
+    }
+    
+    // Extract values (works for both query params and form data)
+    name := r.FormValue("name")
+    email := r.FormValue("email")
+    
+    // Process the values...
+}
+
+func main() {
+    http.HandleFunc("/", submit)
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+### GET vs POST Comparison
+
+<Tabs>
+  <Tab title="POST Form">
+    **URL**: `http://localhost:8080/submit`
+    
+    **Request Body**:
+    ```
+    name=John&email=john@example.com&thought=Hello
+    ```
+    
+    **Use Cases**:
+    - Submitting sensitive data (passwords, personal info)
+    - Creating or updating resources
+    - Large amounts of data
+    - File uploads
+    
+    **HTML Example**:
+    ```html
+    <form action="/submit" method="POST">
+      <input type="text" name="name" required>
+      <input type="email" name="email" required>
+      <textarea name="thought" required></textarea>
+      <button type="submit">Submit</button>
+    </form>
+    ```
+  </Tab>
+  
+  <Tab title="GET Form">
+    **URL**: `http://localhost:8080/?name=John&email=john@example.com`
+    
+    **Request Body**: Empty
+    
+    **Use Cases**:
+    - Search forms
+    - Filtering/sorting data
+    - Bookmarkable URLs
+    - Non-sensitive data
+    
+    **HTML Example**:
+    ```html
+    <form action="/" method="GET">
+      <input type="text" name="name">
+      <input type="email" name="email">
+      <button type="submit">Search</button>
+    </form>
+    ```
+  </Tab>
+</Tabs>
+
+## Form Parsing Methods
+
+Go provides several methods for accessing form data:
+
+| Method | Description | Use Case |
+| :--- | :--- | :--- |
+| `r.ParseForm()` | Parses both POST body and URL query params | Must call before accessing `r.Form` |
+| `r.FormValue(key)` | Returns first value for key (POST or GET) | Simple single-value retrieval |
+| `r.PostFormValue(key)` | Returns value only from POST body | When you want to ignore query params |
+| `r.Form[key]` | Returns slice of all values for key | Multiple values (checkboxes, multi-select) |
+
+### Handling Multiple Values
+
+When a form has multiple inputs with the same name (checkboxes, multi-select):
+
+```go
+err := r.ParseForm()
+if err != nil {
+    // handle error
+}
+
+// Get all values for "hobbies"
+hobbies := r.Form["hobbies"] // []string
+
+for _, hobby := range hobbies {
+    fmt.Println("Hobby:", hobby)
+}
+```
+
+## Complete Example with HTML
+
+<CodeGroup>
+```go server.go
+package main
+
+import (
+    "fmt"
+    "html/template"
+    "net/http"
+)
+
+var formTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Contact Form</title>
+</head>
+<body>
+    <h1>Submit Your Thoughts</h1>
+    <form action="/submit" method="POST">
+        <div>
+            <label>Name:</label>
+            <input type="text" name="name" required>
+        </div>
+        <div>
+            <label>Email:</label>
+            <input type="email" name="email" required>
+        </div>
+        <div>
+            <label>Your Thought:</label>
+            <textarea name="thought" required></textarea>
+        </div>
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>
+`
+
+func formHandler(w http.ResponseWriter, r *http.Request) {
+    tmpl := template.Must(template.New("form").Parse(formTemplate))
+    tmpl.Execute(w, nil)
+}
+
+func submitHandler(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        w.WriteHeader(http.StatusMethodNotAllowed)
+        return
+    }
+    
+    err := r.ParseForm()
+    if err != nil {
+        http.Error(w, "Error parsing form", http.StatusBadRequest)
+        return
+    }
+    
+    name := r.FormValue("name")
+    email := r.FormValue("email")
+    thought := r.FormValue("thought")
+    
+    if name == "" || email == "" || thought == "" {
+        http.Error(w, "All fields are required", http.StatusBadRequest)
+        return
+    }
+    
+    fmt.Printf("Received submission:\n")
+    fmt.Printf("  Name: %s\n", name)
+    fmt.Printf("  Email: %s\n", email)
+    fmt.Printf("  Thought: %s\n", thought)
+    
+    w.Header().Set("Content-Type", "text/html")
+    fmt.Fprintf(w, "<h1>Thank you, %s!</h1>", name)
+    fmt.Fprintf(w, "<p>We received your thought.</p>")
+    fmt.Fprintf(w, "<a href=\"/\">Submit another</a>")
+}
+
+func main() {
+    http.HandleFunc("/", formHandler)
+    http.HandleFunc("/submit", submitHandler)
+    
+    fmt.Println("Server running on http://localhost:8080")
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+```bash Test the Server
+# Start the server
+go run server.go
+
+# Open browser to http://localhost:8080
+# Fill out the form and submit
+```
+</CodeGroup>
+
+## Advanced Form Handling
+
+### Form Validation
+
+Create a validation helper:
+
+```go
+type ValidationError struct {
+    Field   string
+    Message string
+}
+
+func validateForm(r *http.Request) []ValidationError {
+    var errors []ValidationError
+    
+    name := r.FormValue("name")
+    if name == "" {
+        errors = append(errors, ValidationError{
+            Field:   "name",
+            Message: "Name is required",
+        })
+    } else if len(name) < 2 {
+        errors = append(errors, ValidationError{
+            Field:   "name",
+            Message: "Name must be at least 2 characters",
+        })
+    }
+    
+    email := r.FormValue("email")
+    if email == "" {
+        errors = append(errors, ValidationError{
+            Field:   "email",
+            Message: "Email is required",
+        })
+    } else if !strings.Contains(email, "@") {
+        errors = append(errors, ValidationError{
+            Field:   "email",
+            Message: "Invalid email format",
+        })
+    }
+    
+    return errors
+}
+```
+
+### CSRF Protection
+
+<Warning>
+**Security**: Always implement CSRF protection for forms that change server state (POST, PUT, DELETE).
+</Warning>
+
+Use a library like `gorilla/csrf`:
+
+```go
+import "github.com/gorilla/csrf"
+
+func main() {
+    r := mux.NewRouter()
+    r.HandleFunc("/form", formHandler)
+    
+    csrfMiddleware := csrf.Protect([]byte("32-byte-secret-key"))
+    http.ListenAndServe(":8080", csrfMiddleware(r))
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Always Validate">
+    Never trust client input. Validate every field on the server side.
+  </Step>
+  
+  <Step title="Use Appropriate Methods">
+    - POST for state-changing operations
+    - GET for read-only operations
+  </Step>
+  
+  <Step title="Handle Errors Gracefully">
+    Provide clear error messages to help users fix issues.
+  </Step>
+  
+  <Step title="Sanitize Input">
+    Escape HTML and SQL to prevent injection attacks.
+  </Step>
+  
+  <Step title="Set Response Headers">
+    Use appropriate `Content-Type` headers for your responses.
+  </Step>
+</Steps>
+
+## Common Pitfalls
+
+<Warning>
+**Forgetting ParseForm()**: Accessing `r.Form` without calling `r.ParseForm()` results in an empty map.
+</Warning>
+
+<Warning>
+**Ignoring Method Validation**: Always check `r.Method` to prevent incorrect request types.
+</Warning>
+
+<Warning>
+**Poor Error Handling**: Use `http.Error()` to send proper HTTP status codes, not just `fmt.Println()`.
+</Warning>
+
+## Testing Form Handlers
+
+```bash
+# Test POST form submission
+curl -X POST http://localhost:8080/submit \
+  -d "name=John Doe" \
+  -d "email=john@example.com" \
+  -d "thought=This is a test"
+
+# Test GET with query parameters
+curl "http://localhost:8080/?name=Jane&email=jane@example.com"
+```
+
+## Summary
+
+You've learned:
+- How to parse HTML form data with `r.ParseForm()`
+- Difference between POST and GET form handling
+- Extracting form values with `r.FormValue()`
+- Implementing validation and error handling
+- Best practices for secure form processing
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="REST API" icon="code" href="/web/rest-api">
+    Build RESTful APIs with JSON
+  </Card>
+  <Card title="Authentication" icon="shield" href="/web/authentication">
+    Add user authentication to forms
+  </Card>
+</CardGroup>

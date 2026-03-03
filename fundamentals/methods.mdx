@@ -1,0 +1,471 @@
+---
+title: 'Methods in Go'
+description: 'Master structs and methods with value vs pointer receivers, mutation, and command-query separation'
+---
+
+## Overview
+
+Methods in Go allow you to attach behavior to types. The crucial decision you'll make is choosing between **Value Receivers** and **Pointer Receivers**. This choice determines whether your methods can modify state and affects performance.
+
+## The Fundamental Question
+
+Every method forces you to answer:
+> "Does this method need to change the thing it's called on?"
+
+- **Yes** → Use a pointer receiver (`*Type`)
+- **No** → Use a value receiver (`Type`)
+
+## Value vs Pointer Receivers
+
+<Tabs>
+  <Tab title="Value Receiver">
+    A **value receiver** gets a **copy** of the struct.
+    
+    ```go task1/main.go
+    package main
+    
+    import "fmt"
+    
+    type side struct {
+        l, b int
+    }
+    
+    func (s side) area() int {
+        return s.l * s.b
+    }
+    
+    func (s side) para() int {
+        return 2 * (s.l + s.b)
+    }
+    
+    func main() {
+        s := side{10, 20}
+        fmt.Println(s.area(), s.para())  // 200 60
+    }
+    ```
+    
+    **When to use:**
+    - Reading data (getters, calculations)
+    - Small structs (avoid copy overhead)
+    - When you want immutability
+    
+    <Note>
+      Changes made inside the method don't affect the original struct.
+    </Note>
+  </Tab>
+  
+  <Tab title="Pointer Receiver">
+    A **pointer receiver** gets a **reference** to the actual struct.
+    
+    ```go task2/main.go
+    package main
+    
+    import "fmt"
+    
+    type Value struct {
+        x, y int
+    }
+    
+    func (v *Value) change() {
+        v.x = v.x * 10
+        v.y = v.y * 10
+    }
+    
+    func (v Value) area() int {
+        return v.x * v.y
+    }
+    
+    func main() {
+        a := Value{10, 20}
+        a.change()                 // Modifies a
+        fmt.Println(a.area())      // 20000 (100 * 200)
+    }
+    ```
+    
+    **When to use:**
+    - Modifying the receiver (setters, state changes)
+    - Large structs (avoid copy overhead)
+    - Consistency (if any method uses pointer, use it everywhere)
+    
+    <Warning>
+      All methods on a type should use the same receiver type for consistency. Mixing can be confusing.
+    </Warning>
+  </Tab>
+</Tabs>
+
+## Real-World Example: Bank Account
+
+Let's implement a bank account that demonstrates why pointer receivers are essential for state mutation.
+
+```go billing/main.go
+package main
+
+import "fmt"
+
+type Account struct {
+	balance int
+}
+
+func (a *Account) deposit(money int) {
+	a.balance += money
+}
+
+func (a *Account) withdrawl(money int) {
+	a.balance -= money
+	if a.balance < 0 {
+		a.balance = 0
+	}
+}
+
+func (a Account) getBalance() int {
+	return a.balance
+}
+
+func main() {
+	v := Account{100}
+	fmt.Println(v.getBalance())  // 100
+	v.deposit(100)
+	fmt.Println(v.getBalance())  // 200
+	v.withdrawl(100)
+	fmt.Println(v.getBalance())  // 100
+}
+```
+
+<Steps>
+  <Step title="deposit() and withdrawl() use pointer receivers">
+    These methods MUST modify the balance, so they need `*Account`.
+    
+    If we used a value receiver, the money would disappear after the function ends!
+  </Step>
+  
+  <Step title="getBalance() uses a value receiver">
+    This method only reads the balance, so a value receiver is safe.
+    
+    This signals to other developers: "This method doesn't change anything."
+  </Step>
+</Steps>
+
+## Getters and Setters
+
+Go doesn't have public/private keywords. Instead, we use **exported** (capitalized) and **unexported** (lowercase) names.
+
+```go feature/main.go
+package main
+
+import "fmt"
+
+type FeatureFlag struct {
+	enabled bool
+}
+
+func (f *FeatureFlag) enable() {
+	f.enabled = true
+}
+
+func (f *FeatureFlag) disable() {
+	f.enabled = false
+}
+
+func (f FeatureFlag) isEnabled() bool {
+	return f.enabled
+}
+
+func main() {
+	v := FeatureFlag{false}
+	v.enable()
+	fmt.Println(v.isEnabled())  // true
+	v.disable()
+	fmt.Println(v.isEnabled())  // false
+}
+```
+
+**Design Principles:**
+- **Setters** (`enable`, `disable`) → Pointer receivers (write state)
+- **Getters** (`isEnabled`) → Value receiver (read state)
+
+<Note>
+  In Go, getters don't use the `Get` prefix. Instead of `GetBalance()`, use `Balance()`.
+</Note>
+
+## Command-Query Separation
+
+A clean API design principle: methods should either **do something** OR **return something**, but rarely both.
+
+```go task5/main.go
+package main
+
+import "fmt"
+
+type Vertex struct {
+	a, b int
+}
+
+// COMMAND: Changes state, returns nothing
+func (v *Vertex) scale(f int) {
+	v.a = v.a * f
+	v.b = v.b * f
+}
+
+// QUERY: Reads state, returns a value
+func (v *Vertex) abs() int {
+	return v.a * v.b
+}
+
+func main() {
+	v := Vertex{10, 20}
+	v.scale(2)            // command: mutate state
+	fmt.Println(v.abs())  // query: read state (400)
+}
+```
+
+<Accordion title="Why Separate Commands and Queries?">
+  1. **Clarity** - You immediately know if a method has side effects
+  2. **Testing** - Queries can be called multiple times without changing state
+  3. **Concurrency** - Queries are naturally thread-safe (if the data is immutable)
+  4. **Composition** - Commands can be sequenced, queries can be chained
+</Accordion>
+
+## Methods vs Functions
+
+Go provides syntactic sugar for methods that doesn't exist for functions.
+
+```go task3/main.go
+package main
+
+import "fmt"
+
+type Vertex struct {
+	X, Y float64
+}
+
+// METHOD
+func (v *Vertex) Scale(f float64) {
+	v.X = v.X * f
+	v.Y = v.Y * f
+}
+
+// FUNCTION
+func ScaleFunc(v *Vertex, f float64) {
+	v.X = v.X * f
+	v.Y = v.Y * f
+}
+
+func main() {
+	v := Vertex{3, 4}
+	v.Scale(2)          // ✅ Works with value
+	ScaleFunc(&v, 10)   // ✅ Must pass pointer explicitly
+
+	p := &Vertex{4, 3}
+	p.Scale(3)          // ✅ Works with pointer (Go auto-dereferences)
+	ScaleFunc(p, 8)     // ✅ Pointer matches function signature
+
+	fmt.Println(v, p)
+}
+```
+
+### The Magic of Methods
+
+<CodeGroup>
+```go Methods (Flexible)
+// Go automatically handles conversions:
+v := Vertex{3, 4}
+v.Scale(2)    // v.Scale(&v, 2) behind the scenes
+
+p := &Vertex{3, 4}
+p.Scale(2)    // (*p).Scale(2) behind the scenes
+```
+
+```go Functions (Strict)
+// You must match types exactly:
+v := Vertex{3, 4}
+ScaleFunc(&v, 2)  // Must pass &v
+
+p := &Vertex{3, 4}
+ScaleFunc(p, 2)   // p is already a pointer
+```
+</CodeGroup>
+
+<Note>
+  Methods are syntactic sugar. `v.Scale()` works whether `v` is a value or pointer. Functions require exact type matches.
+</Note>
+
+## When to Use Each Receiver Type
+
+<Tabs>
+  <Tab title="Use Pointer Receivers">
+    Choose `*Type` when:
+    
+    1. **The method modifies the receiver**
+    ```go
+    func (a *Account) Deposit(amount int) {
+        a.balance += amount  // Modifying state
+    }
+    ```
+    
+    2. **The struct is large**
+    ```go
+    type LargeStruct struct {
+        data [1000000]byte
+    }
+    
+    func (l *LargeStruct) Process() {
+        // Avoid copying 1MB on every call
+    }
+    ```
+    
+    3. **Consistency with other methods**
+    ```go
+    type User struct {
+        name string
+    }
+    
+    func (u *User) SetName(name string) { /* ... */ }
+    
+    // Keep consistent even for read-only methods
+    func (u *User) Name() string { return u.name }
+    ```
+  </Tab>
+  
+  <Tab title="Use Value Receivers">
+    Choose `Type` when:
+    
+    1. **The method only reads data**
+    ```go
+    func (p Point) Distance() float64 {
+        return math.Sqrt(p.X*p.X + p.Y*p.Y)
+    }
+    ```
+    
+    2. **The struct is small (2-3 fields)**
+    ```go
+    type Point struct {
+        X, Y int
+    }
+    
+    func (p Point) Add(q Point) Point {
+        return Point{p.X + q.X, p.Y + q.Y}
+    }
+    ```
+    
+    3. **You want immutability**
+    ```go
+    type Config struct {
+        timeout time.Duration
+    }
+    
+    func (c Config) WithTimeout(d time.Duration) Config {
+        c.timeout = d
+        return c  // Returns a new copy
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Common Patterns
+
+### Encapsulation Pattern
+
+Bundle data and behavior together:
+
+```go
+type Counter struct {
+	value int  // unexported field (private)
+}
+
+func NewCounter() *Counter {
+	return &Counter{value: 0}
+}
+
+func (c *Counter) Inc() {
+	c.value++
+}
+
+func (c *Counter) Add(n int) {
+	c.value += n
+}
+
+func (c Counter) Value() int {
+	return c.value
+}
+```
+
+### Builder Pattern
+
+Chain method calls by returning the receiver:
+
+```go
+type QueryBuilder struct {
+	table  string
+	where  string
+	limit  int
+}
+
+func (q *QueryBuilder) Table(name string) *QueryBuilder {
+	q.table = name
+	return q
+}
+
+func (q *QueryBuilder) Where(condition string) *QueryBuilder {
+	q.where = condition
+	return q
+}
+
+func (q *QueryBuilder) Limit(n int) *QueryBuilder {
+	q.limit = n
+	return q
+}
+
+// Usage:
+query := new(QueryBuilder).
+	Table("users").
+	Where("age > 18").
+	Limit(10)
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Be consistent">
+    If any method needs a pointer receiver, use pointer receivers for all methods on that type.
+  </Step>
+  
+  <Step title="Follow naming conventions">
+    - Don't use `Get` prefix: `Balance()` not `GetBalance()`
+    - Use short receiver names: `(u *User)` not `(user *User)`
+    - Keep receiver names consistent: always `u` for User, not sometimes `usr`
+  </Step>
+  
+  <Step title="Think about copies">
+    Value receivers copy the entire struct. For large structs, this can be expensive.
+  </Step>
+  
+  <Step title="Consider interfaces">
+    If your type implements an interface, be aware that methods with pointer receivers won't work with value types.
+    
+    ```go
+    type Printer interface {
+        Print()
+    }
+    
+    type Doc struct{}
+    func (d *Doc) Print() {}  // Only *Doc implements Printer
+    
+    var p Printer = Doc{}   // ❌ Compile error
+    var p Printer = &Doc{}  // ✅ Correct
+    ```
+  </Step>
+</Steps>
+
+## Key Takeaways
+
+- **Pointer receivers** (`*Type`) allow mutation and avoid copies
+- **Value receivers** (`Type`) provide safety and immutability
+- Methods get automatic pointer/value conversion, functions don't
+- Keep all methods on a type consistent (all pointer or all value)
+- Command-Query Separation makes code more predictable
+
+## Next Steps
+
+- [Interfaces](/fundamentals/interfaces) - Learn how methods enable polymorphism
+- [Generics](/fundamentals/generics) - Write reusable code with type parameters
+- [Error Handling](/advanced/error-handling) - Methods for custom error types

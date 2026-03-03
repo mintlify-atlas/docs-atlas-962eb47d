@@ -1,0 +1,274 @@
+---
+title: 'Attendance App'
+description: 'A work-in-progress student-teacher attendance tracking system'
+icon: 'clipboard-check'
+---
+
+## Overview
+
+The **Attendance App** is a web application designed to manage classroom attendance with role-based access for teachers and students. Currently in early development, it demonstrates the foundational structure of a production Go application.
+
+<Note>
+This project is actively being built. The documentation reflects the **current state**, including incomplete features and placeholder code.
+</Note>
+
+## Project Vision
+
+When complete, the Attendance App will:
+- Allow teachers to mark student attendance
+- Provide students with a dashboard to view their attendance records
+- Implement JWT-based authentication
+- Use role-based access control (RBAC) to separate teacher and student views
+- Store data persistently in a database
+
+## Current Structure
+
+The project follows Go's standard layout:
+
+```text
+attendence/
+├── cmd/
+│   └── attendence/
+│       └── main.go          # Application entry point
+├── http/
+│   ├── routes.go            # HTTP routing configuration
+│   ├── handlers.go          # HTTP handlers (empty)
+│   └── middleware.go        # Middleware (empty)
+└── internal/
+    └── app/
+        └── app.go           # Server initialization
+```
+
+<Info>
+Note the spelling: the directory is named `attendence` (not "attendance"). Real projects often carry quirks like this!
+</Info>
+
+## Code Walkthrough
+
+### Entry Point (`cmd/attendence/main.go`)
+
+The main function is currently a skeleton:
+
+```go
+package main
+
+func main(){
+    // Server initialization will go here
+}
+```
+
+**What's Missing**: 
+- Server startup logic
+- Configuration loading
+- Database connection
+- Graceful shutdown (see [Graceful Shutdown](/web/graceful-shutdown))
+
+### Server Setup (`internal/app/app.go`)
+
+Defines the HTTP server configuration:
+
+```go
+package app
+
+import "net/http"
+
+func NewServer() *http.Server{
+    return &http.Server{
+        Addr: "8080",
+        Handler: router,
+    }
+}
+```
+
+**Current Issues**:
+- `router` is undefined (needs to be imported from `http` package)
+- Missing `:` prefix in Addr (should be `:8080`)
+- No timeouts configured
+
+<Warning>
+Production servers should **always** set `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` to prevent resource exhaustion.
+</Warning>
+
+### Routing (`http/routes.go`)
+
+Defines the application's URL structure:
+
+```go
+package http
+
+import "net/http"
+
+func NewRouter() http.Handler{
+    mux := http.NewServeMux()
+    
+    // Frontend pages
+    mux.HandleFunc("/signup", SignupPage)
+    mux.HandleFunc("/login", LoginPage)
+    
+    // Role-based dashboards
+    mux.HandleFunc("/teacher", TeachDash)
+    mux.HandleFunc("/student", StuDash)
+
+    // API endpoints
+    mux.HandleFunc("/api/signup", SignupHandler)
+    mux.HandleFunc("/api/login", LoginHandler)
+}
+```
+
+**Observations**:
+- Uses Go's standard `http.NewServeMux()` instead of external routers (like Gorilla Mux from [REST API](/web/rest-api))
+- Missing `return mux` statement
+- Handlers are declared but not implemented
+
+### Route Design
+
+The routing structure reveals the intended architecture:
+
+| Route | Purpose | Status |
+|-------|---------|--------|
+| `/signup` | User registration page | Planned |
+| `/login` | Login page | Planned |
+| `/teacher` | Teacher dashboard | Planned |
+| `/student` | Student dashboard | Planned |
+| `/api/signup` | Registration API endpoint | Planned |
+| `/api/login` | Authentication API endpoint | Planned |
+
+**Design Pattern**: Separates frontend routes (`/login`) from API routes (`/api/login`). This allows:
+- Serving HTML templates for browser requests
+- Returning JSON for API requests
+- Future migration to a separate frontend (React, Vue, etc.)
+
+### Handlers (`http/handlers.go`)
+
+Currently empty, awaiting implementation:
+
+```go
+// File is empty - handlers to be implemented
+```
+
+**Expected Implementation**:
+```go
+func SignupHandler(w http.ResponseWriter, r *http.Request) {
+    // 1. Parse request body
+    // 2. Validate input
+    // 3. Hash password
+    // 4. Store user in database
+    // 5. Return success/error
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+    // 1. Parse credentials
+    // 2. Verify password
+    // 3. Generate JWT token
+    // 4. Return token
+}
+```
+
+### Middleware (`http/middleware.go`)
+
+Also empty, but will eventually handle:
+
+```go
+// Future middleware functions:
+// - JWT verification
+// - Role-based access control
+// - Request logging
+// - CORS headers
+```
+
+## Next Steps
+
+To bring this project to a working state, the following are needed:
+
+<Steps>
+  <Step title="Implement Database Layer">
+    Create `internal/db` package for MongoDB or PostgreSQL connection.
+    
+    Reference: [Authentication](/web/authentication)
+  </Step>
+  
+  <Step title="Build Authentication Service">
+    Implement JWT token generation and validation.
+    
+    Reference: [Authentication](/web/authentication)
+  </Step>
+  
+  <Step title="Complete HTTP Handlers">
+    Write the signup, login, and dashboard handlers with proper error handling.
+  </Step>
+  
+  <Step title="Add Middleware">
+    Protect routes with authentication and role checks.
+  </Step>
+  
+  <Step title="Wire Everything Together">
+    Update `main.go` to initialize all components with dependency injection.
+  </Step>
+</Steps>
+
+## Lessons from This Project
+
+### 1. Start with Structure
+
+Even though most files are empty, the **directory layout** already communicates intent:
+- `cmd/` = "This is an executable"
+- `internal/` = "This logic is private to this app"
+- `http/` = "This handles web concerns"
+
+### 2. Routing is Design
+
+The routes in `routes.go` serve as a **specification**. Before writing any handler logic, we've already decided:
+- What URLs exist
+- What roles are supported
+- How frontend and API are separated
+
+### 3. Work in Progress is Normal
+
+Real projects evolve. This skeleton shows:
+- Missing return statements
+- Undefined variables
+- Empty implementations
+
+**That's okay.** Software development is iterative.
+
+## Comparison to MiniAuth
+
+This project mirrors the structure of [MiniAuth](/web/authentication) from Chapter 10:
+
+| Feature | MiniAuth | Attendance App |
+|---------|----------|----------------|
+| Architecture | Service/Repository | Planned (not implemented) |
+| Database | MongoDB | To be decided |
+| Routing | Custom patterns | Standard `http.ServeMux` |
+| Auth | JWT implemented | JWT planned |
+| Structure | `internal/auth`, `internal/repository` | `internal/app`, `http/` |
+
+<Info>
+The Attendance App uses a flatter structure (`http/` instead of `internal/http`). Both approaches are valid—Go doesn't enforce this.
+</Info>
+
+## Running the Project
+
+<Warning>
+The project cannot currently run due to incomplete implementation. Attempting to build will result in compilation errors.
+</Warning>
+
+Once complete, it should run with:
+
+```bash
+cd attendence
+go run cmd/attendence/main.go
+```
+
+## Cross-References
+
+This project applies concepts from:
+- [Project Structure](/fundamentals/project-structure)
+- [Interfaces for Dependency Injection](/fundamentals/interfaces)
+- [REST API Design](/web/rest-api)
+- [JWT Authentication](/web/authentication)
+- [Clean Architecture](/web/authentication)
+
+---
+
+*This project is a living document. As the code evolves, so will this documentation.*

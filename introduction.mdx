@@ -1,0 +1,180 @@
+---
+title: "Welcome to Go Journey"
+description: "Learn Go programming through practical projects and real-world examples"
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="Go Journey Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="Go Journey Hero Dark"
+/>
+
+## What is Go Journey?
+
+Go Journey is a comprehensive learning path that takes you from Go beginner to building production-ready applications. This documentation accompanies a hands-on repository where each chapter is a real project that teaches specific concepts through practical implementation.
+
+Rather than just reading about Go, you'll understand how memory works, why interfaces matter, and how to build scalable web applications by actually building them.
+
+## Why Learn With Go Journey?
+
+<CardGroup cols={2}>
+  <Card title="Learn by Building" icon="hammer" color="#00ADD8">
+    Every concept is tied to a working project. No abstract theory—just practical code you can run, modify, and deploy.
+  </Card>
+  
+  <Card title="Understand the Runtime" icon="microchip" color="#5DC9E2">
+    Go beyond syntax. Learn how the garbage collector works, when variables escape to the heap, and how to profile your code.
+  </Card>
+  
+  <Card title="Production Patterns" icon="server" color="#00758D">
+    Learn proper project structure, dependency injection, graceful shutdown, and authentication—skills needed for real applications.
+  </Card>
+  
+  <Card title="Progressive Complexity" icon="stairs" color="#00ADD8">
+    Start with a simple "Hello World" web server and progress to building REST APIs with MongoDB, JWT authentication, and worker pools.
+  </Card>
+</CardGroup>
+
+## What You'll Learn
+
+### Fundamentals
+
+Build a solid foundation in Go's core concepts:
+
+<CardGroup cols={2}>
+  <Card title="Project Structure" icon="folder-tree" href="/fundamentals/project-structure">
+    Learn the standard Go project layout with `cmd/`, `internal/`, and Go modules
+  </Card>
+  
+  <Card title="The Runtime" icon="gauge-high" href="/fundamentals/runtime">
+    Master stack vs heap, escape analysis, garbage collection, and profiling with pprof
+  </Card>
+  
+  <Card title="Methods" icon="function" href="/fundamentals/methods">
+    Understand value vs pointer receivers and when to use each
+  </Card>
+  
+  <Card title="Interfaces" icon="plug" href="/fundamentals/interfaces">
+    Learn Go's implicit interfaces and dependency injection patterns
+  </Card>
+</CardGroup>
+
+### Advanced Concepts
+
+Dive deeper into Go's powerful features:
+
+<CardGroup cols={2}>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/advanced/error-handling">
+    Master errors as values, sentinel errors, and custom error types
+  </Card>
+  
+  <Card title="Concurrency" icon="arrows-split-up-and-left" href="/advanced/concurrency">
+    Build worker pools with goroutines, channels, and sync.WaitGroup
+  </Card>
+  
+  <Card title="Generics" icon="code" href="/fundamentals/generics">
+    Write reusable code with type parameters and constraints
+  </Card>
+  
+  <Card title="Data Structures" icon="database" href="/advanced/data-structures">
+    Implement stacks, queues, and understand memory layout
+  </Card>
+</CardGroup>
+
+### Web Development
+
+Build production-ready web applications:
+
+<CardGroup cols={2}>
+  <Card title="REST APIs" icon="globe" href="/web/rest-api">
+    Create a full CRUD API with routing, JSON handling, and HTTP methods
+  </Card>
+  
+  <Card title="Authentication" icon="lock" href="/web/authentication">
+    Implement JWT authentication with MongoDB and clean architecture
+  </Card>
+  
+  <Card title="Middleware" icon="layer-group" href="/web/authentication">
+    Build reusable middleware for logging, auth, and request validation
+  </Card>
+  
+  <Card title="Graceful Shutdown" icon="power-off" href="/web/graceful-shutdown">
+    Handle server shutdown cleanly with context and signals
+  </Card>
+</CardGroup>
+
+### Real-World Projects
+
+Apply everything in complete applications:
+
+<CardGroup cols={2}>
+  <Card title="Project Overview" icon="rocket" href="/projects/overview">
+    See how concepts combine into production applications
+  </Card>
+  
+  <Card title="Attendance System" icon="clipboard-check" href="/projects/attendance-app">
+    Build a full-stack attendance tracking application
+  </Card>
+</CardGroup>
+
+## Learning Path
+
+New to Go? Follow this recommended path:
+
+<Steps>
+  <Step title="Get Started">
+    Start with the [Quickstart](/quickstart) to install Go and run your first web server.
+  </Step>
+  
+  <Step title="Master Fundamentals">
+    Work through the Fundamentals section to understand Go's core concepts and runtime behavior.
+  </Step>
+  
+  <Step title="Build Real Applications">
+    Apply your knowledge by building REST APIs and web applications in the Web Development section.
+  </Step>
+  
+  <Step title="Deploy Projects">
+    Complete the Projects section to build production-ready applications from scratch.
+  </Step>
+</Steps>
+
+<Note>
+  **Repository Access**: All code examples are available in the [Go Journey GitHub repository](https://github.com/priyanshu-samal/Go). Clone it to follow along and experiment with the code.
+</Note>
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Hands-On Learning" icon="laptop-code">
+    Every chapter includes working code you can run immediately. No setup complexity—just clone and go.
+  </Accordion>
+  
+  <Accordion title="Deep Understanding" icon="brain">
+    Learn not just what to do, but why. Understand escape analysis output, GC behavior, and runtime decisions.
+  </Accordion>
+  
+  <Accordion title="Production Patterns" icon="building">
+    Learn the patterns used in real companies: proper error handling, structured logging, clean architecture, and testable code.
+  </Accordion>
+  
+  <Accordion title="Progressive Complexity" icon="chart-line">
+    Start simple and build complexity gradually. Each project builds on concepts from previous chapters.
+  </Accordion>
+</AccordionGroup>
+
+## Ready to Start?
+
+<Card
+  title="Begin Your Go Journey"
+  icon="rocket"
+  href="/quickstart"
+  horizontal
+>
+  Install Go and run your first web server in under 5 minutes.
+</Card>

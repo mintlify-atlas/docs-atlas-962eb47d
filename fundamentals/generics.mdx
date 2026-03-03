@@ -1,0 +1,604 @@
+---
+title: 'Generics in Go'
+description: 'Write type-safe, reusable code with Go generics, type constraints, and type parameters'
+---
+
+## Overview
+
+Go 1.18 introduced **Generics**, allowing functions and types to work with **any** set of types while maintaining type safety. This eliminates the need for code duplication and unsafe type assertions.
+
+<Note>
+  Before generics, you had to either duplicate code for each type or use `interface{}` and lose type safety.
+</Note>
+
+## The Problem Generics Solve
+
+<Tabs>
+  <Tab title="Without Generics">
+    ```go
+    // Need separate functions for each type
+    func PrintInt(v int) {
+        fmt.Println(v)
+    }
+    
+    func PrintString(v string) {
+        fmt.Println(v)
+    }
+    
+    func PrintUser(v User) {
+        fmt.Println(v)
+    }
+    
+    // Or lose type safety with interface{}
+    func Print(v interface{}) {
+        fmt.Println(v)  // No compile-time type checking
+    }
+    ```
+  </Tab>
+  
+  <Tab title="With Generics">
+    ```go task1/main.go
+    package main
+    
+    import "fmt"
+    
+    func Print[T any](v T) {
+        fmt.Println(v)
+    }
+    
+    func main() {
+        Print(10)           // T is int
+        Print("golang")     // T is string
+        Print(true)         // T is bool
+    
+        type User struct {
+            name string
+        }
+    
+        u := User{name: "Ravi"}
+        Print(u)            // T is User
+    }
+    ```
+    
+    **One function works for all types!**
+  </Tab>
+</Tabs>
+
+## Basic Syntax: Type Parameters
+
+The syntax `[T any]` defines a **type parameter**:
+
+```go
+func FunctionName[T TypeConstraint](param T) T {
+    // T can be used like any other type
+    return param
+}
+```
+
+<Steps>
+  <Step title="Square Brackets [T any]">
+    Declares a type parameter named `T` with the constraint `any`.
+  </Step>
+  
+  <Step title="The any Constraint">
+    `any` is an alias for `interface{}`, meaning "any type is allowed."
+  </Step>
+  
+  <Step title="Use T Like a Type">
+    Inside the function, `T` acts like a normal type.
+  </Step>
+</Steps>
+
+## Generic Functions
+
+### Simple Generic Function
+
+```go task3/main.go
+package main
+
+func Identity[T any](a T) T {
+	return a
+}
+
+func main() {
+   Identity(10)        // Returns 10 (int)
+   Identity("Hello")   // Returns "Hello" (string)
+   Identity(2.67)      // Returns 2.67 (float64)
+}
+```
+
+The compiler **infers** the type parameter automatically from the arguments.
+
+### Generic Swap Function
+
+```go task4/main.go
+package main
+
+import "fmt"
+
+func Swap[T any](a, b *T) {
+	*a, *b = *b, *a
+}
+
+func main() {
+	x := 10
+	y := 20
+	Swap(&x, &y)
+	fmt.Println(x, y)  // 20 10
+
+	s1 := "hello"
+	s2 := "world"
+	Swap(&s1, &s2)
+	fmt.Println(s1, s2)  // world hello
+}
+```
+
+<Note>
+  Without generics, you'd need `SwapInt`, `SwapString`, `SwapFloat`, etc. Or use reflection, which is slow and loses type safety.
+</Note>
+
+## Generic Types
+
+You can also create generic structs:
+
+```go task2/main.go
+package main
+
+import "fmt"
+
+type Box[T any] struct {
+	value T
+}
+
+func main() {
+	intBox := Box[int]{value: 10}
+	strBox := Box[string]{value: "golang"}
+
+	fmt.Println(intBox.value)  // 10
+	fmt.Println(strBox.value)  // golang
+}
+```
+
+**Real-World Use Case:**
+```go
+type Stack[T any] struct {
+    items []T
+}
+
+func (s *Stack[T]) Push(item T) {
+    s.items = append(s.items, item)
+}
+
+func (s *Stack[T]) Pop() (T, bool) {
+    if len(s.items) == 0 {
+        var zero T
+        return zero, false
+    }
+    item := s.items[len(s.items)-1]
+    s.items = s.items[:len(s.items)-1]
+    return item, true
+}
+
+// Usage
+intStack := Stack[int]{}
+intStack.Push(1)
+intStack.Push(2)
+val, _ := intStack.Pop()  // val is int, guaranteed
+```
+
+## Type Constraints
+
+`any` is too permissive sometimes. You might need to restrict which types are allowed.
+
+### Built-in Constraints
+
+```go
+import "golang.org/x/exp/constraints"
+
+// Only numeric types
+func Sum[T constraints.Ordered](a, b T) T {
+    return a + b
+}
+
+Sum(10, 20)       // ✅ Works
+Sum(1.5, 2.3)     // ✅ Works
+Sum("a", "b")     // ❌ Compile error: strings don't support +
+```
+
+### Common Constraints
+
+<Tabs>
+  <Tab title="any">
+    ```go
+    func Print[T any](v T) {
+        fmt.Println(v)
+    }
+    ```
+    Allows **any** type.
+  </Tab>
+  
+  <Tab title="comparable">
+    ```go
+    func Contains[T comparable](slice []T, item T) bool {
+        for _, v := range slice {
+            if v == item {  // Requires ==
+                return true
+            }
+        }
+        return false
+    }
+    ```
+    Types that support `==` and `!=`.
+  </Tab>
+  
+  <Tab title="constraints.Ordered">
+    ```go
+    import "golang.org/x/exp/constraints"
+    
+    func Max[T constraints.Ordered](a, b T) T {
+        if a > b {  // Requires >
+            return a
+        }
+        return b
+    }
+    ```
+    Types that support `<`, `>`, `<=`, `>=`.
+  </Tab>
+  
+  <Tab title="constraints.Integer">
+    ```go
+    func Double[T constraints.Integer](n T) T {
+        return n * 2
+    }
+    ```
+    Only integer types (int, int8, int16, uint, etc.).
+  </Tab>
+</Tabs>
+
+## Custom Constraints
+
+You can define your own constraints using interfaces:
+
+```go
+// Only types with a String() method
+type Stringer interface {
+    String() string
+}
+
+func PrintString[T Stringer](v T) {
+    fmt.Println(v.String())
+}
+
+// Usage
+type User struct {
+    Name string
+}
+
+func (u User) String() string {
+    return u.Name
+}
+
+u := User{Name: "Alice"}
+PrintString(u)  // ✅ User has String() method
+```
+
+### Union Constraints
+
+Allow specific types using the `|` operator:
+
+```go
+type Number interface {
+    int | int64 | float64
+}
+
+func Add[T Number](a, b T) T {
+    return a + b
+}
+
+Add(10, 20)          // ✅ int
+Add(1.5, 2.5)        // ✅ float64
+Add("a", "b")        // ❌ Compile error: string not in union
+```
+
+## Generic Data Structures
+
+### Generic Linked List
+
+```go
+type Node[T any] struct {
+    Value T
+    Next  *Node[T]
+}
+
+type LinkedList[T any] struct {
+    Head *Node[T]
+}
+
+func (l *LinkedList[T]) Add(value T) {
+    node := &Node[T]{Value: value, Next: l.Head}
+    l.Head = node
+}
+
+func (l *LinkedList[T]) Print() {
+    current := l.Head
+    for current != nil {
+        fmt.Println(current.Value)
+        current = current.Next
+    }
+}
+
+// Usage
+list := LinkedList[int]{}
+list.Add(1)
+list.Add(2)
+list.Add(3)
+list.Print()  // 3, 2, 1
+```
+
+### Generic Map Functions
+
+```go
+func Map[T any, U any](slice []T, fn func(T) U) []U {
+    result := make([]U, len(slice))
+    for i, v := range slice {
+        result[i] = fn(v)
+    }
+    return result
+}
+
+// Usage
+numbers := []int{1, 2, 3, 4}
+doubled := Map(numbers, func(n int) int {
+    return n * 2
+})  // [2, 4, 6, 8]
+
+strings := Map(numbers, func(n int) string {
+    return fmt.Sprintf("#%d", n)
+})  // ["#1", "#2", "#3", "#4"]
+```
+
+### Generic Filter
+
+```go
+func Filter[T any](slice []T, predicate func(T) bool) []T {
+    result := []T{}
+    for _, v := range slice {
+        if predicate(v) {
+            result = append(result, v)
+        }
+    }
+    return result
+}
+
+// Usage
+numbers := []int{1, 2, 3, 4, 5, 6}
+evens := Filter(numbers, func(n int) bool {
+    return n%2 == 0
+})  // [2, 4, 6]
+```
+
+## Type Inference
+
+Go can infer type parameters in most cases:
+
+<CodeGroup>
+```go Explicit Type Parameters
+result := Max[int](10, 20)
+```
+
+```go Inferred (Preferred)
+result := Max(10, 20)  // Go infers T is int
+```
+</CodeGroup>
+
+You only need explicit type parameters when:
+- The compiler can't infer the type
+- You want to be explicit for clarity
+- You're creating a value of a generic type
+
+```go
+// Explicit needed here
+stack := Stack[int]{}  // What would T be without [int]?
+
+// Inferred here
+stack.Push(42)  // Go knows T is int from the stack type
+```
+
+## When to Use Generics
+
+<Tabs>
+  <Tab title="Good Use Cases">
+    **1. Data Structures**
+    ```go
+    type Stack[T any] struct { /* ... */ }
+    type Queue[T any] struct { /* ... */ }
+    type Tree[T comparable] struct { /* ... */ }
+    ```
+    
+    **2. Algorithms**
+    ```go
+    func Sort[T constraints.Ordered](slice []T) { /* ... */ }
+    func BinarySearch[T comparable](slice []T, target T) int { /* ... */ }
+    ```
+    
+    **3. Utility Functions**
+    ```go
+    func Map[T, U any](slice []T, fn func(T) U) []U { /* ... */ }
+    func Filter[T any](slice []T, fn func(T) bool) []T { /* ... */ }
+    func Reduce[T, U any](slice []T, init U, fn func(U, T) U) U { /* ... */ }
+    ```
+    
+    **4. Type-Safe Wrappers**
+    ```go
+    type Result[T any] struct {
+        Value T
+        Err   error
+    }
+    
+    type Option[T any] struct {
+        value   T
+        present bool
+    }
+    ```
+  </Tab>
+  
+  <Tab title="When NOT to Use">
+    **1. Simple cases**
+    ```go
+    // ❌ Overkill
+    func Add[T int](a, b T) T { return a + b }
+    
+    // ✅ Better
+    func Add(a, b int) int { return a + b }
+    ```
+    
+    **2. When interfaces are clearer**
+    ```go
+    // ❌ Worse
+    func Process[T Processor](p T) { p.Process() }
+    
+    // ✅ Better
+    func Process(p Processor) { p.Process() }
+    ```
+    
+    **3. Over-abstraction**
+    ```go
+    // ❌ Too complex
+    func DoThing[T any, U comparable, V constraints.Ordered](
+        a T, b U, c V) (T, U, V) { /* ... */ }
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  Don't add generics just because you can. Use them when they eliminate real duplication or improve type safety.
+</Warning>
+
+## Generics vs Interfaces
+
+<Accordion title="When to Use Which">
+  **Use Generics When:**
+  - You need the **exact same logic** for multiple types
+  - You want **compile-time type safety**
+  - You're building **data structures** or **algorithms**
+  
+  ```go
+  // Generic: Type is known at compile time
+  func First[T any](slice []T) T {
+      return slice[0]
+  }
+  ```
+  
+  **Use Interfaces When:**
+  - You need **runtime polymorphism**
+  - Different types have **different implementations**
+  - You want **dependency injection**
+  
+  ```go
+  // Interface: Implementation varies by type
+  type Shape interface {
+      Area() float64
+  }
+  
+  func TotalArea(shapes []Shape) float64 {
+      total := 0.0
+      for _, s := range shapes {
+          total += s.Area()  // Different for each shape
+      }
+      return total
+  }
+  ```
+</Accordion>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use descriptive type parameter names">
+    ```go
+    // ❌ Unclear
+    func Process[A any, B any](a A, b B) {}
+    
+    // ✅ Clear
+    func Convert[Input any, Output any](in Input) Output {}
+    
+    // ✅ Standard conventions
+    func Map[T any, U any](slice []T, fn func(T) U) []U {}
+    ```
+  </Step>
+  
+  <Step title="Keep constraints minimal">
+    ```go
+    // ❌ Too restrictive
+    func Print[T fmt.Stringer](v T) {
+        fmt.Println(v.String())
+    }
+    
+    // ✅ More flexible
+    func Print[T any](v T) {
+        fmt.Println(v)
+    }
+    ```
+  </Step>
+  
+  <Step title="Prefer type inference">
+    ```go
+    // ❌ Explicit (unnecessary)
+    result := Max[int](10, 20)
+    
+    // ✅ Inferred (cleaner)
+    result := Max(10, 20)
+    ```
+  </Step>
+  
+  <Step title="Don't over-generalize">
+    Only add generics when you have at least 2-3 use cases.
+    
+    <Note>
+      "A little copying is better than a little dependency" - Rob Pike
+    </Note>
+  </Step>
+</Steps>
+
+## Real-World Example: Result Type
+
+```go
+type Result[T any] struct {
+    Value T
+    Err   error
+}
+
+func (r Result[T]) IsOk() bool {
+    return r.Err == nil
+}
+
+func (r Result[T]) Unwrap() (T, error) {
+    return r.Value, r.Err
+}
+
+// Usage
+func FetchUser(id int) Result[User] {
+    user, err := db.GetUser(id)
+    return Result[User]{Value: user, Err: err}
+}
+
+result := FetchUser(123)
+if result.IsOk() {
+    fmt.Println(result.Value.Name)
+} else {
+    fmt.Println("Error:", result.Err)
+}
+```
+
+## Key Takeaways
+
+- Generics provide **type-safe code reuse** without duplication
+- Use `[T any]` for type parameters
+- Constraints limit which types are allowed (`any`, `comparable`, custom interfaces)
+- Type inference works in most cases—explicit types rarely needed
+- Use generics for **data structures** and **algorithms**, not everything
+- Interfaces and generics solve different problems—use the right tool
+
+## Next Steps
+
+- [Error Handling](/advanced/error-handling) - Custom error types and patterns
+- [Concurrency](/advanced/concurrency) - Goroutines, channels, and patterns

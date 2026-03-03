@@ -1,0 +1,74 @@
+{
+  "projectType": "general",
+  "projectName": "Go Journey",
+  "projectDescription": "A comprehensive learning repository documenting Go programming concepts through practical projects and examples.",
+  "theme": "palm",
+  "primaryColor": "#00ADD8",
+  "lightColor": "#5DC9E2",
+  "darkColor": "#00758D",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Fundamentals",
+        "pages": [
+          "fundamentals/project-structure",
+          "fundamentals/runtime",
+          "fundamentals/methods",
+          "fundamentals/interfaces",
+          "fundamentals/generics"
+        ]
+      },
+      {
+        "group": "Advanced Concepts",
+        "pages": [
+          "advanced/error-handling",
+          "advanced/concurrency",
+          "advanced/data-structures"
+        ]
+      },
+      {
+        "group": "Web Development",
+        "pages": [
+          "web/rest-api",
+          "web/forms",
+          "web/authentication",
+          "web/graceful-shutdown"
+        ]
+      },
+      {
+        "group": "Projects",
+        "pages": [
+          "projects/overview",
+          "projects/attendance-app"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Project-based learning approach",
+    "Comprehensive coverage from basics to advanced topics",
+    "Practical examples with real-world applications",
+    "RESTful API development with Gorilla Mux",
+    "JWT authentication and clean architecture patterns",
+    "Concurrency patterns with worker pools",
+    "Error handling with sentinel errors and custom types",
+    "Interface-driven design and dependency injection"
+  ],
+  "publicApiSurface": [
+    "CRUD REST API endpoints (GET, POST, PUT, DELETE /movies)",
+    "Authentication service with JWT",
+    "Worker pool implementation for concurrent tasks",
+    "Custom error types (ConnectionError, NotFound)",
+    "Generic utility functions",
+    "Interface implementations (Shape, Logger, Notifier)",
+    "Stack and Queue data structures",
+    "MongoDB repository pattern"
+  ]
+}
